@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const arbeitsagenturBtn = document.getElementById("arbeitsagentur-btn");
   const ausbildungBtn = document.getElementById("ausbildung-btn");
   const aubiplusBtn = document.getElementById("aubiplus-btn");
+  const azubiBtn = document.getElementById("azubi-btn");
   const downloadBtn = document.getElementById("download-btn");
   const statusText = document.getElementById("status-text");
   const countDisplay = document.getElementById("scraped-count");
@@ -48,6 +49,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       arbBtn: "Open Arbeitsagentur",
       ausBtn: "Open Ausbildung.de",
       aubiBtn: "Open Aubi-Plus.de",
+      azubiBtn: "Open Azubi.de",
       gmapsBtn: "Open Google Maps",
       pauseBtn: "Pause",
       resumeBtn: "Resume",
@@ -82,6 +84,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       arbBtn: "انتقل إلى Arbeitsagentur",
       ausBtn: "اذهب إلى Ausbildung.de",
       aubiBtn: "اذهب إلى Aubi-Plus.de",
+      azubiBtn: "افتح Azubi.de",
       gmapsBtn: "الذهاب إلى خرائط جوجل",
       pauseBtn: "إيقاف مؤقت",
       resumeBtn: "استئناف",
@@ -247,6 +250,8 @@ document.addEventListener("DOMContentLoaded", async () => {
               scriptToInject = "ausbildung_script.js";
             } else if (currTab.url && currTab.url.includes("aubi-plus.de")) {
               scriptToInject = "aubiplus_script.js";
+            } else if (currTab.url && currTab.url.includes("azubi.de")) {
+              scriptToInject = "azubi_script.js";
             }
 
             await chrome.scripting.executeScript({
@@ -279,6 +284,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       url.includes("arbeitsagentur.de/ksw/ergebnisliste") ||
       url.includes("ausbildung.de") ||
       url.includes("aubi-plus.de") ||
+      url.includes("azubi.de") ||
       (url.includes("google.") && url.includes("map")) ||
       url.includes("dasoertliche.de")
     );
@@ -421,6 +427,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   aubiplusBtn.addEventListener("click", () => {
     chrome.tabs.create({ url: "https://www.aubi-plus.de/" });
   });
+
+  if (azubiBtn) {
+    azubiBtn.addEventListener("click", () => {
+      chrome.tabs.create({ url: "https://www.azubi.de/ausbildungsplatz/suche" });
+    });
+  }
 
   if (gmapsBtn) {
     gmapsBtn.addEventListener("click", () => {

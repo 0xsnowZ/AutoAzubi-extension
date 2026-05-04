@@ -11,6 +11,7 @@ A Chrome extension that automatically scrapes Ausbildung (apprenticeship) job li
 | [arbeitsagentur.de](https://www.arbeitsagentur.de) | Job listings with company, email, phone, address, contact person |
 | [ausbildung.de](https://www.ausbildung.de) | Apprenticeship listings with company, email, address |
 | [aubi-plus.de](https://www.aubi-plus.de) | Apprenticeship listings with company, email, phone, address |
+| [azubi.de](https://www.azubi.de) | Apprenticeship listings with company, email, phone, address |
 | [Google Maps → DasÖrtliche.de](https://www.dasoertliche.de) | Business listings with company, email, phone, address |
 
 ---

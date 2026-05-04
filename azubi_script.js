@@ -1,4 +1,4 @@
-// ausbildung_script.js - Scraper for ausbildung.de
+// azubi_script.js - Scraper for azubi.de
 let isScraping = false;
 let isPaused = false;
 let targetLimit = 50;
@@ -13,14 +13,23 @@ function extractEmailFromHtml(html) {
     const mailtoMatch = html.match(/href=["']mailto:([^"'?\s]+)/i);
     if (mailtoMatch) return mailtoMatch[1].trim();
 
+    // Fallback: plain email regex
     const emailMatch = html.match(/\b([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,6})\b/);
     if (emailMatch) return emailMatch[1].trim();
 
     return '';
 }
 
-// Extract company name — JSON-LD first, then DOM selectors
+// Extract phone from raw HTML — only match tel: href, avoid SVG/other false positives
+function extractPhoneFromHtml(html) {
+    const telMatch = html.match(/href=["']tel:([^"'?\s]+)/i);
+    if (telMatch) return telMatch[1].trim();
+    return '';
+}
+
+// Extract company name — try JSON-LD first (most reliable), then DOM selectors
 function extractCompanyFromDoc(doc) {
+    // 1. JSON-LD structured data (most reliable)
     const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
     for (const script of scripts) {
         try {
@@ -30,59 +39,96 @@ function extractCompanyFromDoc(doc) {
                 if (item.hiringOrganization && item.hiringOrganization.name) {
                     return item.hiringOrganization.name.trim();
                 }
+                if (item['@type'] === 'Organization' && item.name) {
+                    return item.name.trim();
+                }
             }
         } catch (e) {}
     }
 
+    // 2. Specific DOM selectors for azubi.de
     const selectors = [
-        '.jp-c-header__corporation-link',
-        '[class*="corporation-link"]',
         '[class*="company-name"]',
-        '[class*="employer"]',
+        '[class*="companyName"]',
+        '[class*="employer-name"]',
+        '[class*="employerName"]',
+        '[class*="corporation"]',
+        '[itemprop="name"]',
+        '[class*="hiring-organization"]',
     ];
     for (const sel of selectors) {
         const el = doc.querySelector(sel);
         if (el) {
             const text = el.textContent.trim();
-            if (text && text.length < 120) return text;
+            if (text && text.length < 100) return text;
         }
     }
     return '';
 }
 
-// Extract address — JSON-LD first, then specific selectors
+// Extract address — use JSON-LD first, then itemprop, then broad text selectors
 function extractAddressFromDoc(doc) {
+    // 1. JSON-LD structured data
     const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
     for (const script of scripts) {
         try {
             const data = JSON.parse(script.textContent);
             const items = Array.isArray(data) ? data : [data];
             for (const item of items) {
+                // JobPosting jobLocation
                 if (item.jobLocation) {
                     const loc = Array.isArray(item.jobLocation) ? item.jobLocation[0] : item.jobLocation;
                     if (loc && loc.address) {
-                        const addr = loc.address;
-                        if (typeof addr === 'string' && addr.trim()) return addr.trim();
-                        const street = addr.streetAddress || '';
-                        const postal = addr.postalCode || '';
-                        const city = addr.addressLocality || '';
-                        if (street) {
-                            const extra = [postal, city].filter(p => p && !street.includes(p));
-                            return extra.length ? `${street}, ${extra.join(', ')}` : street;
+                            const addr = loc.address;
+                            if (typeof addr === 'string' && addr.trim()) return addr.trim();
+                            // streetAddress sometimes already contains postalCode+city — avoid duplication
+                            const street = addr.streetAddress || '';
+                            const postal = addr.postalCode || '';
+                            const city = addr.addressLocality || '';
+                            if (street) {
+                                // Only append postal/city if not already contained in street
+                                const extra = [postal, city].filter(p => p && !street.includes(p));
+                                return extra.length ? `${street}, ${extra.join(', ')}` : street;
+                            }
+                            const parts = [postal, city].filter(Boolean);
+                            if (parts.length) return parts.join(', ');
                         }
-                        const parts = [postal, city].filter(Boolean);
-                        if (parts.length) return parts.join(', ');
-                    }
+                    // Sometimes address is directly on the Place
+                    if (loc && loc.name) return loc.name.trim();
+                }
+                // Direct address field
+                if (item.address) {
+                    const addr = item.address;
+                    if (typeof addr === 'string' && addr.trim()) return addr.trim();
+                    const parts = [addr.streetAddress, addr.postalCode, addr.addressLocality]
+                        .filter(Boolean);
+                    if (parts.length) return parts.join(', ');
                 }
             }
         } catch (e) {}
     }
 
+    // 2. itemprop selectors (schema.org microdata)
+    const locality = doc.querySelector('[itemprop="addressLocality"]');
+    const postal = doc.querySelector('[itemprop="postalCode"]');
+    const street = doc.querySelector('[itemprop="streetAddress"]');
+    if (locality || postal || street) {
+        return [street, postal, locality]
+            .map(el => el ? el.textContent.trim() : '')
+            .filter(Boolean).join(', ');
+    }
+
+    // 3. Location-specific selectors — must be short (< 100 chars) to avoid grabbing card text
     const selectors = [
-        '.jp-title__address',
-        '[itemprop="addressLocality"]',
         '[class*="job-location"]',
+        '[class*="jobLocation"]',
         '[class*="location-text"]',
+        '[class*="locationText"]',
+        '[class*="standort"]',
+        '[class*="city"]',
+        '[class*="ort"]',
+        '[data-testid*="location"]',
+        '[data-testid*="address"]',
     ];
     for (const sel of selectors) {
         const el = doc.querySelector(sel);
@@ -94,17 +140,32 @@ function extractAddressFromDoc(doc) {
     return '';
 }
 
-// Extract all job detail links from a parsed document
+// Extract all unique job detail links from a parsed document
 function extractJobLinksFromDoc(doc) {
     const links = new Set();
-    doc.querySelectorAll('a[href*="/stellen/"]').forEach(a => {
-        // getAttribute gives the raw href, avoiding chrome-extension:// resolution
+    doc.querySelectorAll('a[href]').forEach(a => {
+        // Use getAttribute to get raw href (avoids chrome-extension:// resolution in DOMParser)
         const href = a.getAttribute('href');
         if (!href) return;
+
         // Build absolute URL
-        let url = href.startsWith('http') ? href : 'https://www.ausbildung.de' + href;
+        let url;
+        if (href.startsWith('http')) {
+            url = href;
+        } else if (href.startsWith('/')) {
+            url = 'https://www.azubi.de' + href;
+        } else {
+            return;
+        }
+
         url = url.split('?')[0]; // strip query params
-        if (url.includes('/stellen/') && !url.endsWith('/stellen/')) {
+
+        // Match azubi.de job detail URL patterns — must start with a numeric ID
+        if (
+            url.match(/azubi\.de\/ausbildungsplatz\/\d+[\w\-]+$/) ||
+            url.match(/azubi\.de\/berufsausbildung\/\d+[\w\-]+$/) ||
+            url.match(/azubi\.de\/stelle\/\d+[\w\-]+$/)
+        ) {
             links.add(url);
         }
     });
@@ -117,7 +178,7 @@ function getJobLinksFromPage() {
 }
 
 // Build the search URL for a given page number
-// ausbildung.de uses ?page=N in the URL
+// azubi.de uses ?page=N in the URL
 function buildPageUrl(baseUrl, page) {
     const url = new URL(baseUrl);
     if (page > 1) {
@@ -169,29 +230,29 @@ async function handleSearchPage(limit = 50) {
             pageDoc = document;
         } else {
             const pageUrl = buildPageUrl(baseUrl, page);
-            console.log(`[Ausbildung] Fetching page ${page}: ${pageUrl}`);
+            console.log(`[Azubi] Fetching page ${page}: ${pageUrl}`);
             try {
                 const res = await fetch(pageUrl, { credentials: 'include' });
                 if (!res.ok) {
-                    console.warn('[Ausbildung] Page fetch failed:', res.status);
+                    console.warn('[Azubi] Page fetch failed:', res.status);
                     break;
                 }
                 const html = await res.text();
                 const parser = new DOMParser();
                 pageDoc = parser.parseFromString(html, 'text/html');
             } catch (err) {
-                console.error('[Ausbildung] Error fetching page:', err);
+                console.error('[Azubi] Error fetching page:', err);
                 break;
             }
         }
 
         const jobLinks = extractJobLinksFromDoc(pageDoc).filter(l => !processedLinks.has(l));
-        console.log(`[Ausbildung] Page ${page}: found ${jobLinks.length} new job links`);
+        console.log(`[Azubi] Page ${page}: found ${jobLinks.length} new job links`);
 
         if (jobLinks.length === 0) {
             emptyPageCount++;
             if (emptyPageCount >= MAX_EMPTY_PAGES) {
-                console.log('[Ausbildung] No more results after', MAX_EMPTY_PAGES, 'empty pages.');
+                console.log('[Azubi] No more results after', MAX_EMPTY_PAGES, 'empty pages.');
                 break;
             }
             page++;
@@ -209,13 +270,19 @@ async function handleSearchPage(limit = 50) {
             try {
                 const response = await fetch(jobUrl, { credentials: 'include' });
                 if (!response.ok) {
-                    console.warn('[Ausbildung] Job fetch failed:', jobUrl, response.status);
+                    console.warn('[Azubi] Fetch failed:', jobUrl, response.status);
                     continue;
                 }
 
                 const html = await response.text();
+
                 const email = extractEmailFromHtml(html);
-                if (!email) continue;
+                if (!email) {
+                    console.log('[Azubi] No email, skipping:', jobUrl);
+                    continue;
+                }
+
+                const phone = extractPhoneFromHtml(html);
 
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
@@ -230,15 +297,15 @@ async function handleSearchPage(limit = 50) {
                     contact: '',
                     anrede: '',
                     link: jobUrl,
-                    phone: ''
+                    phone
                 });
 
                 await new Promise(r => chrome.storage.local.set({ scrapedData: currentData }, r));
                 chrome.runtime.sendMessage({ action: 'progress', count: currentData.length });
-                console.log(`[Ausbildung] Extracted (${currentData.length}/${limit}):`, { company, email });
+                console.log(`[Azubi] Extracted (${currentData.length}/${limit}):`, { company, email, address, phone });
 
             } catch (err) {
-                console.error('[Ausbildung] Error fetching job:', jobUrl, err);
+                console.error('[Azubi] Error fetching:', jobUrl, err);
             }
 
             await sleep(300);
@@ -258,25 +325,23 @@ async function handleSearchPage(limit = 50) {
     isPaused = false;
 }
 
-// Count available results
+// Count available results on the current page
 async function countResults() {
     await sleep(800);
 
-    const headlineSelectors = [
-        '[class*="headline"]',
+    const selectors = [
         '[class*="result-count"]',
-        '[class*="SearchResults"] h1',
-        '[class*="SearchResults"] h2',
-        '[data-testid="search-result-title"]',
+        '[class*="resultCount"]',
+        '[class*="headline"]',
         'h1',
         'h2',
     ];
 
-    for (const sel of headlineSelectors) {
+    for (const sel of selectors) {
         const el = document.querySelector(sel);
         if (!el) continue;
         const text = el.innerText || el.textContent || '';
-        const match = text.match(/([\d.,]+)\s*(freie|Ausbildung|Stellen|Ergebnisse|results)/i);
+        const match = text.match(/([\d.,]+)\s*(Ausbildung|Stellen|Ergebnisse|results|freie|Jobs|Angebote)/i);
         if (match) return parseInt(match[1].replace(/[.,]/g, ''), 10);
         const numMatch = text.match(/^([\d.,]+)/);
         if (numMatch) return parseInt(numMatch[1].replace(/[.,]/g, ''), 10);
@@ -285,7 +350,7 @@ async function countResults() {
     return getJobLinksFromPage().length;
 }
 
-// Listen for popup actions
+// Listen for popup messages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.settings) {
         settings = request.settings;

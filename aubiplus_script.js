@@ -39,7 +39,7 @@ async function applyFilters() {
             if (!ausbildungCheckbox.checked) {
                 ausbildungLabel.click();
                 // Wait a bit for the page to refresh or apply the filter
-                await new Promise(r => setTimeout(r, 1500));
+                await new Promise(r => setTimeout(r, 800));
             }
         }
     }
@@ -54,7 +54,7 @@ async function handleSearchPage(limit = 50) {
     await applyFilters();
 
     // Give it a moment to ensure cards are loaded
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise(r => setTimeout(r, 1000));
 
     let currentData = await new Promise(r => {
         chrome.storage.local.get(['scrapedData'], res => r(res.scrapedData || []));
@@ -202,7 +202,7 @@ async function handleSearchPage(limit = 50) {
                 console.error("Error fetching details", err);
             }
 
-            await new Promise(r => setTimeout(r, 1000));
+            await new Promise(r => setTimeout(r, 300));
         }
 
         currentPage++;

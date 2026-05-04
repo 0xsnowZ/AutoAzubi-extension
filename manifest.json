@@ -8,6 +8,7 @@
     "*://*.arbeitsagentur.de/*",
     "*://*.ausbildung.de/*",
     "*://*.aubi-plus.de/*",
+    "*://*.azubi.de/*",
     "*://*.google.com/maps/*",
     "*://*.google.de/maps/*",
     "*://maps.google.com/*",
@@ -34,6 +35,7 @@
         "*://*.arbeitsagentur.de/*",
         "*://*.aubi-plus.de/*",
         "*://*.ausbildung.de/*",
+        "*://*.azubi.de/*",
         "*://*.google.com/*",
         "*://*.google.de/*",
         "*://maps.google.com/*",
@@ -53,6 +55,10 @@
     {
       "matches": ["*://*.aubi-plus.de/*"],
       "js": ["aubiplus_script.js"]
+    },
+    {
+      "matches": ["*://*.azubi.de/*"],
+      "js": ["azubi_script.js"]
     },
     {
       "matches": [
