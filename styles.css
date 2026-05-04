@@ -283,6 +283,8 @@ button {
 .setting-item label {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  flex-direction: row-reverse;
   gap: 10px;
   font-size: 13px;
   color: var(--text-main);
@@ -290,9 +292,40 @@ button {
 }
 
 .setting-item input[type="checkbox"] {
-  accent-color: var(--accent);
-  width: 16px;
-  height: 16px;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 34px;
+  height: 20px;
+  background: var(--bg-color);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  position: relative;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.setting-item input[type="checkbox"]::after {
+  content: '';
+  position: absolute;
+  top: 1.5px;
+  left: 2px;
+  width: 15px;
+  height: 15px;
+  background: var(--text-dim);
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.setting-item input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.setting-item input[type="checkbox"]:checked::after {
+  transform: translateX(13px);
+  background: var(--text-main);
 }
 
 .instructions {
