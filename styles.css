@@ -307,7 +307,7 @@ button {
 }
 
 .setting-item input[type="checkbox"]::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 1.5px;
   left: 2px;

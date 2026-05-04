@@ -472,19 +472,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   function downloadCSV(data) {
-    // Requirement 3: CSV order - Company Name, Email, Address, D empty, E empty, Ansprechpartner, Anrede, H empty, I empty, website, telephone
     const headers = [
       "Company Name",
       "Email",
       "Address",
-      "",
-      "",
       "Ansprechpartner",
       "Anrede",
-      "",
-      "",
-      "website",
-      "telephone",
+      "Website",
+      "Telephone",
     ];
     const csvContent = [
       headers.join(","),
@@ -495,12 +490,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           row.company || "",
           row.email || "",
           row.address || "",
-          "", // empty D
-          "", // empty E
           contact,
           anrede,
-          "", // empty H
-          "", // empty I
           row.link || "",
           row.phone || "",
         ];

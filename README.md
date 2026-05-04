@@ -77,11 +77,12 @@ A Chrome extension that automatically scrapes Ausbildung (apprenticeship) job li
 
 The exported file is named `scraped_jobs_YYYY-MM-DD.csv` with the following columns:
 
-| A | B | C | D | E | F | G | H | I | J | K |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Company Name | Email | Address | *(empty)* | *(empty)* | Ansprechpartner | Anrede | *(empty)* | *(empty)* | Website | Telephone |
+| A | B | C | D | E | F | G |
+|---|---|---|---|---|---|---|
+| Company Name | Email | Address | Ansprechpartner | Anrede | Website | Telephone |
 
 > Only entries **with an email address** are included in the output.
+> `Ansprechpartner` and `Anrede` are only populated for Arbeitsagentur listings.
 
 ---
 
