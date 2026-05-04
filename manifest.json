@@ -1,0 +1,73 @@
+{
+  "manifest_version": 3,
+  "name": "AutoAzubi Extractor",
+  "version": "1.0",
+  "description": "Automatically extracts Ausbildung job listings and contact details from multiple job portals",
+  "permissions": ["activeTab", "storage", "downloads", "scripting"],
+  "host_permissions": [
+    "*://*.arbeitsagentur.de/*",
+    "*://*.ausbildung.de/*",
+    "*://*.aubi-plus.de/*",
+    "*://*.google.com/maps/*",
+    "*://*.google.de/maps/*",
+    "*://maps.google.com/*",
+    "*://maps.google.de/*",
+    "*://www.dasoertliche.de/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["captcha.mp3", "finished.mp3", "icons/*"],
+      "matches": [
+        "*://*.arbeitsagentur.de/*",
+        "*://*.aubi-plus.de/*",
+        "*://*.ausbildung.de/*",
+        "*://*.google.com/*",
+        "*://*.google.de/*",
+        "*://maps.google.com/*",
+        "*://maps.google.de/*"
+      ]
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://*.arbeitsagentur.de/*"],
+      "js": ["content_script.js"]
+    },
+    {
+      "matches": ["*://*.ausbildung.de/*"],
+      "js": ["ausbildung_script.js"]
+    },
+    {
+      "matches": ["*://*.aubi-plus.de/*"],
+      "js": ["aubiplus_script.js"]
+    },
+    {
+      "matches": [
+        "*://*.google.com/maps/*",
+        "*://*.google.de/maps/*",
+        "*://maps.google.com/*",
+        "*://maps.google.de/*"
+      ],
+      "js": ["gmaps_script.js"]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
+  }
+}
