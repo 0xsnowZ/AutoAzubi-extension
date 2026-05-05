@@ -4,6 +4,7 @@ let isScraping = false;
 let isPaused = false;
 let scrapedData = [];
 let targetLimit = 50;
+let currentPageUrl = null; // tracks pagination position for pause/resume
 
 // Helper function to wait
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -94,17 +95,23 @@ async function startScraping() {
 
     console.log(`Starting background scrape for: Keyword=${keyword}, City=${city}`);
 
-    let nextPageUrl = `https://www.dasoertliche.de/?kw=${encodeURIComponent(keyword)}&ci=${encodeURIComponent(city)}&form_name=search_nat`;
+    // On first start (or after reset), begin from page 1
+    // On resume, currentPageUrl is already set to where we left off
+    if (!currentPageUrl) {
+        currentPageUrl = `https://www.dasoertliche.de/?kw=${encodeURIComponent(keyword)}&ci=${encodeURIComponent(city)}&form_name=search_nat`;
+    }
 
-    while (nextPageUrl && isScraping && scrapedData.length < targetLimit) {
-        if (isPaused) {
-            console.log("Scraping paused...");
-            break; // Exit loop, resume will re-call startScraping
+    while (currentPageUrl && isScraping && scrapedData.length < targetLimit) {
+        // Pause: wait in-place instead of breaking out of the loop
+        while (isPaused) {
+            await sleep(300);
+            if (!isScraping) break;
         }
+        if (!isScraping) break;
 
-        console.log("Fetching list page: " + nextPageUrl);
+        console.log("Fetching list page: " + currentPageUrl);
 
-        const response = await chrome.runtime.sendMessage({ action: 'fetch_text', url: nextPageUrl });
+        const response = await chrome.runtime.sendMessage({ action: 'fetch_text', url: currentPageUrl });
         if (!response || !response.success) {
             console.error("Failed to fetch list page", response ? response.error : 'No response');
             break;
@@ -121,7 +128,7 @@ async function startScraping() {
                 redirectUrl = 'https://www.dasoertliche.de' + (redirectUrl.startsWith('/') ? '' : '/') + redirectUrl;
             }
             console.log("Ortsauswahl detected. Redirecting to first option: " + redirectUrl);
-            nextPageUrl = redirectUrl;
+            currentPageUrl = redirectUrl;
             continue; // Proceed directly to the valid target page
         }
 
@@ -160,50 +167,55 @@ async function startScraping() {
                     detailUrl = 'https://www.dasoertliche.de' + (detailUrl.startsWith('/') ? '' : '/') + detailUrl;
                 }
 
-                await sleep(1000); // Be polite to the server
+                await sleep(200); // Small delay between detail fetches
 
                 console.log(`Fetching detail page: ${detailUrl}`);
                 const detailResp = await chrome.runtime.sendMessage({ action: 'fetch_text', url: detailUrl });
                 if (detailResp && detailResp.success) {
-                    const detailDoc = parser.parseFromString(detailResp.text, 'text/html');
+                    const rawHtml = detailResp.text;
 
-                    // requirement: copy the email (in span) in this class "mail"
-                    // If "mail" class doesn't exist, ignore it.
-                    const mailWrapper = detailDoc.querySelector('.mail');
-                    if (mailWrapper) {
-                        const mailSpan = mailWrapper.querySelector('span');
-                        let email = '';
-                        if (mailSpan) {
-                            email = mailSpan.textContent.trim();
-                        } else {
-                            email = mailWrapper.textContent.trim();
-                        }
+                    // Extract email from raw HTML:
+                    // 1. Try href="mailto:..." on .mail anchor
+                    // 2. Try title="..." on .mail anchor
+                    // 3. Fallback: plain email regex on raw HTML
+                    let email = '';
 
-                        email = email.replace('mailto:', '').trim();
+                    const mailtoHref = rawHtml.match(/class="mail"[^>]*href="mailto:([^"?\s]+)"/i)
+                        || rawHtml.match(/href="mailto:([^"?\s]+)"[^>]*class="mail"/i);
+                    if (mailtoHref) {
+                        email = mailtoHref[1].trim();
+                    }
 
-                        if (email) {
-                            scrapedData.push({
-                                company,
-                                address,
-                                phone,
-                                email
-                            });
-                            console.log(`Extracted data (${scrapedData.length}):`, { company, email });
-                            // Store locally just in case
-                            chrome.storage.local.set({ scrapedData });
-                            // Notify popup if it's open
-                            chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length });
-                        } else {
-                            console.log("Found mail wrapper but no email content:", company);
-                        }
+                    if (!email) {
+                        const titleMatch = rawHtml.match(/class="mail"[^>]*title="([^"@\s]+@[^"@\s]+)"/i)
+                            || rawHtml.match(/title="([^"@\s]+@[^"@\s]+)"[^>]*class="mail"/i);
+                        if (titleMatch) email = titleMatch[1].trim();
+                    }
+
+                    if (!email) {
+                        // Generic mailto: fallback
+                        const genericMailto = rawHtml.match(/href="mailto:([^"?\s]+)"/i);
+                        if (genericMailto) email = genericMailto[1].trim();
+                    }
+
+                    if (email) {
+                        scrapedData.push({
+                            company,
+                            address,
+                            phone,
+                            email
+                        });
+                        console.log(`Extracted data (${scrapedData.length}):`, { company, email });
+                        chrome.storage.local.set({ scrapedData });
+                        chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length });
                     } else {
-                        console.log("No mail class found in detail page for:", company);
+                        console.log("No email found in detail page for:", company);
                     }
                 }
             }
         }
 
-        if (!isScraping || isPaused || scrapedData.length >= targetLimit) {
+        if (!isScraping || scrapedData.length >= targetLimit) {
             break;
         }
 
@@ -214,17 +226,17 @@ async function startScraping() {
             if (!nextHref.startsWith('http')) {
                 nextHref = 'https://www.dasoertliche.de' + (nextHref.startsWith('/') ? '' : '/') + nextHref;
             }
-            nextPageUrl = nextHref;
-            console.log("Found next page:", nextPageUrl);
+            currentPageUrl = nextHref;
+            console.log("Found next page:", currentPageUrl);
         } else {
             console.log("No next page link found. Finished.");
-            nextPageUrl = null;
+            currentPageUrl = null;
         }
 
-        await sleep(2000); // Politeness delay between pages
+        await sleep(500); // Delay between pages
     }
 
-    if (isScraping && !isPaused && (scrapedData.length >= targetLimit || !nextPageUrl)) {
+    if (isScraping && !isPaused && (scrapedData.length >= targetLimit || !currentPageUrl)) {
         console.log("Scraping finished.");
         if (settings.notifyFinish) finishedSound.play().catch(e => console.error("Audio play error", e));
         isScraping = false;
@@ -244,6 +256,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         case 'start':
             isScraping = true;
             isPaused = false;
+            currentPageUrl = null; // always restart from page 1 on fresh start
             if (request.reset) {
                 scrapedData = [];
             }
@@ -256,19 +269,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             sendResponse({ status: 'paused' });
             break;
         case 'resume':
+            // pause now waits in-place — just unset isPaused, loop continues automatically
             isPaused = false;
-            if (isScraping) startScraping();
             sendResponse({ status: 'resumed' });
             break;
         case 'stop':
             isScraping = false;
             isPaused = false;
+            currentPageUrl = null;
             sendResponse({ status: 'stopped' });
             break;
         case 'reset':
             isScraping = false;
             isPaused = false;
             scrapedData = [];
+            currentPageUrl = null;
             sendResponse({ status: 'reset' });
             break;
         case 'getData':

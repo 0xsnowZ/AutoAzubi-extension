@@ -123,7 +123,7 @@ async function getInitialInfo() {
 async function countResults() {
     console.log("Applying filters before counting...");
     await applyFilter();
-    await sleep(2000);
+    await sleep(800);
     return await getInitialInfo();
 }
 
@@ -140,7 +140,7 @@ async function startScraping() {
     if (viewTab) {
         console.log("Switching to list view...");
         viewTab.click();
-        await sleep(1500);
+        await sleep(800);
     }
 
     while (isScraping) {
@@ -159,7 +159,7 @@ async function startScraping() {
                 const card = cards[i];
                 card.click();
 
-                await sleep(1500);
+                await sleep(800);
 
                 if (await handleCaptcha()) {
                     // logic inside handlCaptcha waits for solve
@@ -176,7 +176,7 @@ async function startScraping() {
                     chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length });
                 }
 
-                await sleep(1000);
+                await sleep(300);
             }
         }
 
@@ -189,7 +189,7 @@ async function startScraping() {
         if (loadMoreBtn && isScraping && !isPaused) {
             console.log("Loading more results...");
             loadMoreBtn.click();
-            await sleep(3000);
+            await sleep(1500);
         } else if (!loadMoreBtn) {
             console.log("No more results available.");
             break;
@@ -212,21 +212,21 @@ async function applyFilter() {
     if (filterToggle) {
         if (filterToggle.getAttribute('aria-expanded') !== 'true') {
             filterToggle.click();
-            await sleep(800);
+            await sleep(400);
         }
 
         const extFilter = document.querySelector('input[type="checkbox"][id*="externe"]');
         if (extFilter && !extFilter.checked) {
             console.log("Enabling 'no external offers' filter...");
             extFilter.click();
-            await sleep(1000);
+            await sleep(500);
         }
 
         const applyBtn = document.getElementById('footer-button-modales-slide-in-filter');
         if (applyBtn) {
             console.log("Clicking apply filters button...");
             applyBtn.click();
-            await sleep(2000);
+            await sleep(800);
         }
     }
 }
