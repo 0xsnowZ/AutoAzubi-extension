@@ -142,12 +142,10 @@ async function startScraping() {
             if (!isScraping || isPaused) break;
             if (scrapedData.length >= targetLimit) break;
 
-            // Check for requirement: look for this class button "hitlnk_mail" or "hitlnk_mail_detail"
-            const mailDetailBtn = hit.querySelector('.hitlnk_mail, .hitlnk_mail_detail');
-            if (!mailDetailBtn) {
-                // if they don't exist, we skip
-                continue;
-            }
+            // Only fetch detail page if the list page shows a mail button
+            // This avoids fetching hundreds of detail pages with no email
+            const mailBtn = hit.querySelector('.hitlnk_mail, .hitlnk_mail_detail');
+            if (!mailBtn) continue;
 
             const nameLink = hit.querySelector('.hitlnk_name');
             if (!nameLink) continue;
