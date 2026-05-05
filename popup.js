@@ -484,6 +484,25 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   function downloadCSV(data) {
+    // Deduplicate before export:
+    // - rows with email: deduplicate by email (case-insensitive)
+    // - rows without email: deduplicate by company+address
+    const seenEmails = new Set();
+    const seenCompanyAddr = new Set();
+    data = data.filter((row) => {
+      const email = (row.email || '').trim().toLowerCase();
+      if (email) {
+        if (seenEmails.has(email)) return false;
+        seenEmails.add(email);
+        return true;
+      }
+      // No email — deduplicate by company+address
+      const key = `${(row.company || '').trim().toLowerCase()}|${(row.address || '').trim().toLowerCase()}`;
+      if (seenCompanyAddr.has(key)) return false;
+      seenCompanyAddr.add(key);
+      return true;
+    });
+
     const headers = [
       "Company Name",
       "Email",
