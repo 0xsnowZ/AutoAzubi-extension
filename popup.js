@@ -430,7 +430,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (azubiBtn) {
     azubiBtn.addEventListener("click", () => {
-      chrome.tabs.create({ url: "https://www.azubi.de/ausbildungsplatz/suche" });
+      chrome.tabs.create({ url: "https://www.azubi.de/ausbildungsplatz" });
     });
   }
 
