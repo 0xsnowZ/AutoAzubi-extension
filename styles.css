@@ -222,32 +222,6 @@ button {
   gap: 8px;
 }
 
-#start-btn,
-#resume-btn {
-  background: var(--accent);
-  color: white;
-}
-
-#start-btn:hover,
-#resume-btn:hover {
-  background: var(--accent-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-}
-
-#stop-btn,
-#pause-btn {
-  background: var(--card-bg);
-  color: var(--text-main);
-  border: 1px solid var(--border);
-}
-
-#stop-btn:hover,
-#pause-btn:hover {
-  background: var(--border);
-}
-
-#count-btn,
 .secondary-btn {
   background: var(--bg-color);
   color: var(--text-dim);
@@ -255,7 +229,6 @@ button {
   transition: all 0.2s ease;
 }
 
-#count-btn:hover,
 .secondary-btn:hover {
   background: var(--card-bg);
   color: var(--text-main);
@@ -431,4 +404,479 @@ button:disabled {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* --- NEW UI/UX ENHANCEMENTS --- */
+.view {
+  display: none;
+}
+.view.active-view {
+  display: block;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  background: var(--card-bg);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.tab-btn {
+  flex: 1;
+  background: transparent;
+  color: var(--text-dim);
+  border: none;
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.tab-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+}
+
+.tab-btn.active {
+  background: var(--bg-color);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Settings Accordion */
+details.settings-section {
+  background: var(--bg-color);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: 16px;
+  margin-bottom: 0px;
+  padding: 0;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+details.settings-section summary {
+  padding: 12px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  list-style: none;
+  background: var(--card-bg);
+}
+
+details.settings-section summary::-webkit-details-marker {
+  display: none;
+}
+
+details.settings-section summary::before {
+  content: "⚙️";
+  margin-right: 8px;
+}
+
+[dir="rtl"] details.settings-section summary::before {
+  margin-right: 0;
+  margin-left: 8px;
+}
+
+details.settings-section[open] summary {
+  border-bottom: 1px solid var(--border);
+  color: var(--text-main);
+}
+
+details.settings-section .settings-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Grid for Grid Buttons (Portals) */
+.portals-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+  margin-bottom: 16px;
+}
+
+.portals-grid .secondary-btn {
+  font-size: 12px;
+  padding: 10px 4px;
+  text-align: center;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+}
+
+.portals-grid .secondary-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Progress bar container */
+.progress-container {
+  width: 100%;
+  height: 6px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  margin-top: 12px;
+  overflow: hidden;
+  display: none;
+}
+
+.progress-container.active {
+  display: block;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.status-card.running {
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.15);
+  border-color: var(--accent);
+}
+
+/* Activity Log (Ticker style) */
+.activity-log {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: none;
+}
+
+.activity-log.active {
+  display: block;
+}
+
+/* --- PREMIUM UI REFINEMENTS --- */
+.primary-btn {
+  background: var(--accent);
+  color: white;
+  border: 1px solid var(--accent);
+}
+.primary-btn:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.danger-btn {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.danger-btn:hover {
+  background: var(--error);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.warning-btn {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.warning-btn:hover {
+  background: var(--warning);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.success-btn {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  margin-top: 12px;
+  width: 100%;
+}
+.success-btn:hover:not(:disabled) {
+  background: var(--success);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+.success-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: transparent;
+  color: var(--text-dim);
+  border-color: var(--border);
+}
+
+.portal-btn {
+  font-size: 12px;
+  padding: 10px 4px;
+  text-align: center;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.portal-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.view-title {
+  margin-bottom: 20px;
+  font-size: 18px;
+  font-family: inherit;
+  font-weight: 600;
+  text-align: center;
+}
+
+.input-field {
+  margin-bottom: 16px;
+}
+
+.view-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.view-actions .primary-btn {
+  padding: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+svg {
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+/* Add striped animated progress bar */
+.progress-striped {
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.15) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.15) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 1rem 1rem;
+  animation: progress-stripes 1s linear infinite;
+}
+
+@keyframes progress-stripes {
+  from {
+    background-position: 1rem 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+/* --- ENHANCED BUTTON OVERRIDES (Match Image) --- */
+
+.btn-row#initial-btns {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+#initial-btns .primary-btn {
+  flex: 1.5; /* Makes it wider */
+  background: #6366f1;
+  color: white;
+  border-radius: 10px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 14px;
+  text-align: left;
+  line-height: 1.2;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+#initial-btns .primary-btn span {
+  display: flex;
+  flex-direction: column;
+}
+
+#initial-btns .primary-btn:hover {
+  background: #5a5ae6;
+  transform: translateY(-1px);
+}
+
+#initial-btns .secondary-btn,
+#initial-btns .danger-btn {
+  flex: 1; /* Makes them smaller */
+  background: #161821; /* Match form background */
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+#initial-btns .secondary-btn {
+  color: #94a3b8;
+}
+
+#initial-btns .secondary-btn:hover {
+  background: #1e202d;
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+#initial-btns .danger-btn {
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+#initial-btns .danger-btn:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* Also enhance input fields to match dark theme premium look */
+input[type="number"],
+input[type="text"] {
+  background: #161821;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+input[type="number"]:focus,
+input[type="text"]:focus {
+  border-color: #6366f1;
+  background: #1a1c27;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+#initial-btns .primary-btn span {
+  display: block;
+  white-space: pre-wrap;
+  text-align: left;
+  line-height: 1.1;
+  font-size: 14px;
+}
+
+button svg,
+button span {
+  pointer-events: none;
+}
+
+/* --- CUSTOM CONFIRM MODAL --- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.modal-overlay.show {
+  opacity: 1;
+  pointer-events: all;
+}
+.custom-modal {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  width: 90%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  transform: translateY(10px);
+  transition: transform 0.2s ease;
+  text-align: center;
+}
+.modal-overlay.show .custom-modal {
+  transform: translateY(0);
+}
+.custom-modal h3 {
+  font-size: 16px;
+  margin-bottom: 8px;
+  color: var(--text-main);
+}
+.custom-modal p {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 20px;
+  line-height: 1.4;
+}
+.modal-btns {
+  display: flex;
+  gap: 10px;
+}
+.modal-btns button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+}
+.btn-cancel {
+  background: var(--bg-color);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+.btn-cancel:hover {
+  background: #1e202d;
+  color: var(--text-main);
+}
+.btn-confirm {
+  background: var(--error);
+  color: white;
+  border: none;
+}
+.btn-confirm:hover {
+  background: #dc2626;
+}
+
+/* --- HIDE NUMBER INPUT SPINNERS --- */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
 }

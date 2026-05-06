@@ -1,6 +1,26 @@
 document.addEventListener("DOMContentLoaded", async () => {
   // View Elements
   const mainView = document.getElementById("main-view");
+  const gmapsView = document.getElementById("gmaps-view");
+
+  // Tabs Elements
+  const tabJobs = document.getElementById("tab-jobs");
+  const tabGmaps = document.getElementById("tab-gmaps");
+
+  // Setup tabs logic
+  tabJobs.addEventListener("click", () => {
+    tabJobs.classList.add("active");
+    tabGmaps.classList.remove("active");
+    mainView.classList.add("active-view");
+    gmapsView.classList.remove("active-view");
+  });
+
+  tabGmaps.addEventListener("click", () => {
+    tabGmaps.classList.add("active");
+    tabJobs.classList.remove("active");
+    gmapsView.classList.add("active-view");
+    mainView.classList.remove("active-view");
+  });
 
   // Scraper UI Elements
   const startBtn = document.getElementById("start-btn");
@@ -18,10 +38,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   const countDisplay = document.getElementById("scraped-count");
   const totalDisplay = document.getElementById("total-found");
   const limitInput = document.getElementById("fetch-limit");
+  const progressBar = document.getElementById("progress-bar");
+  const progressContainer = document.getElementById("progress-container");
+  const activityLog = document.getElementById("activity-log");
+  const statusCard = document.getElementById("status-card");
+
+  function updateProgress() {
+    let current = parseInt(countDisplay.innerText) || 0;
+    let target = limitInput.value ? parseInt(limitInput.value) : 1;
+    let percent = Math.min((current / target) * 100, 100);
+    progressBar.style.width = percent + "%";
+  }
 
   // GMaps UI Elements
   const gmapsBtn = document.getElementById("gmaps-btn");
-  const gmapsView = document.getElementById("gmaps-view");
   const gmapsKeyword = document.getElementById("gmaps-keyword");
   const gmapsCity = document.getElementById("gmaps-city");
   const gmapsSearchBtn = document.getElementById("gmaps-search-btn");
@@ -43,8 +73,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       statusRunning: "Running",
       statusPaused: "Paused",
       targetLabel: "Target Number of Offers",
-      countBtn: "Count Available",
-      startBtn: "Start Scraping",
+      countBtn: "Count",
+      startBtn: "Start\nScraping",
       resetBtn: "Reset",
       arbBtn: "Open Arbeitsagentur",
       ausBtn: "Open Ausbildung.de",
@@ -55,10 +85,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       resumeBtn: "Resume",
       stopBtn: "Stop",
       settingsTitle: "Settings",
+      tabJobs: "Job Portals",
+      tabGmaps: "Google Maps",
       captchaLabel: "Captcha Sound",
       finishLabel: "Finish Sound",
       noteTitle: "Note:",
-      noteDesc: "Solve captchas manually if they appear to keep the scraper running.",
+      noteDesc:
+        "Solve captchas manually if they appear to keep the scraper running.",
       downloadBtn: "Download CSV Results",
       applyingFilters: "Applying filters...",
       refreshPage: "Please refresh the page",
@@ -78,8 +111,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       statusRunning: "قيد التشغيل",
       statusPaused: "متوقف مؤقتاً",
       targetLabel: "العدد المستهدف للعروض",
-      countBtn: "حساب المتاح",
-      startBtn: "بدء الاستخراج",
+      countBtn: "حساب",
+      startBtn: "بدء\nالاستخراج",
       resetBtn: "إعادة ضبط",
       arbBtn: "انتقل إلى Arbeitsagentur",
       ausBtn: "اذهب إلى Ausbildung.de",
@@ -90,6 +123,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       resumeBtn: "استئناف",
       stopBtn: "إيقاف",
       settingsTitle: "الإعدادات",
+      tabJobs: "بوابات الوظائف",
+      tabGmaps: "خرائط جوجل",
       captchaLabel: "صوت الكابتشا",
       finishLabel: "صوت الانتهاء",
       noteTitle: "ملاحظة:",
@@ -177,6 +212,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (result.scrapedData) {
           countDisplay.innerText = result.scrapedData.length;
           downloadBtn.disabled = result.scrapedData.length === 0;
+          updateProgress();
         }
 
         if (result.targetLimit) {
@@ -318,14 +354,40 @@ document.addEventListener("DOMContentLoaded", async () => {
       ongoingBtns.classList.remove("hidden");
       pauseBtn.classList.remove("hidden");
       resumeBtn.classList.add("hidden");
+
+      progressContainer.classList.add("active");
+      activityLog.classList.add("active");
+      statusCard.classList.add("running");
+      progressBar.classList.add("progress-striped");
+      if (activityLog.innerText === "Ready to start..." || activityLog.innerText === "Ready to download.") {
+        activityLog.innerText = "Extracting data...";
+      }
     } else if (status === "paused") {
       initialBtns.classList.add("hidden");
       ongoingBtns.classList.remove("hidden");
       pauseBtn.classList.add("hidden");
       resumeBtn.classList.remove("hidden");
+
+      progressContainer.classList.add("active");
+      activityLog.classList.add("active");
+      progressBar.classList.remove("progress-striped");
     } else if (status === "idle" || status === "finished") {
       initialBtns.classList.remove("hidden");
       ongoingBtns.classList.add("hidden");
+      statusCard.classList.remove("running");
+
+      if (status === "finished") {
+        progressContainer.classList.add("active");
+        activityLog.classList.add("active");
+        progressBar.classList.remove("progress-striped");
+        activityLog.innerText = "Ready to download.";
+        progressBar.style.width = "100%";
+      } else {
+        progressContainer.classList.remove("active");
+        activityLog.classList.remove("active");
+        progressBar.style.width = "0%";
+        activityLog.innerText = "Ready to start...";
+      }
     }
   }
 
@@ -338,10 +400,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     sendMessageToTab({ action: "getInitialInfo" }, (response) => {
       if (response) {
         if (response.total) totalDisplay.innerText = response.total;
-        if (response.scrapedCount !== undefined)
+        if (response.scrapedCount !== undefined) {
           countDisplay.innerText = response.scrapedCount;
+          updateProgress();
+        }
         if (response.isScraping)
           updateUI(response.isPaused ? "paused" : "running");
+
+        // Auto-count total if not provided by getInitialInfo and not already scraping
+        if (!response.total && !response.isScraping) {
+          sendMessageToTab({ action: "countResults" }, (countResponse) => {
+            if (countResponse && countResponse.total !== undefined) {
+              totalDisplay.innerText = countResponse.total;
+              limitInput.value = Math.min(parseInt(limitInput.value), countResponse.total);
+            }
+          });
+        }
       }
     });
   }
@@ -400,18 +474,30 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   resetBtn.addEventListener("click", async () => {
-    if (confirm("Are you sure you want to clear all scraped data?")) {
+    const modal = document.getElementById("confirmModal");
+    const confirmBtn = document.getElementById("modalConfirm");
+    const cancelBtn = document.getElementById("modalCancel");
+
+    modal.classList.add("show");
+
+    confirmBtn.onclick = () => {
+      modal.classList.remove("show");
       sendMessageToTab({ action: "reset" }, (response) => {
         if (response && response.status === "reset") {
           countDisplay.innerText = "0";
           totalDisplay.innerText = "?";
           downloadBtn.disabled = true;
+          updateProgress();
           updateUI("idle");
         } else if (!response) {
-          statusText.innerText = i18n[currentLang]["refreshPage"];
+          updateUI("error", "Error connecting to content script.");
         }
       });
-    }
+    };
+
+    cancelBtn.onclick = () => {
+      modal.classList.remove("show");
+    };
   });
 
   arbeitsagenturBtn.addEventListener("click", () => {
@@ -472,13 +558,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (request.status === "waiting_captcha") {
         updateUI("paused");
         statusText.innerText = i18n[currentLang]["waitingCaptcha"];
+        activityLog.innerText = "Captcha detected... Please solve.";
       } else {
         countDisplay.innerText = request.count;
+        if (request.currentTitle) {
+          activityLog.innerText = `Extracted: ${request.currentTitle}`;
+        }
+        updateProgress();
         downloadBtn.disabled = false;
       }
     } else if (request.action === "finished") {
       updateUI("finished");
       countDisplay.innerText = request.count;
+      updateProgress();
       downloadBtn.disabled = false;
     }
   });
@@ -490,14 +582,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     const seenEmails = new Set();
     const seenCompanyAddr = new Set();
     data = data.filter((row) => {
-      const email = (row.email || '').trim().toLowerCase();
+      const email = (row.email || "").trim().toLowerCase();
       if (email) {
         if (seenEmails.has(email)) return false;
         seenEmails.add(email);
         return true;
       }
       // No email — deduplicate by company+address
-      const key = `${(row.company || '').trim().toLowerCase()}|${(row.address || '').trim().toLowerCase()}`;
+      const key = `${(row.company || "").trim().toLowerCase()}|${(row.address || "").trim().toLowerCase()}`;
       if (seenCompanyAddr.has(key)) return false;
       seenCompanyAddr.add(key);
       return true;
