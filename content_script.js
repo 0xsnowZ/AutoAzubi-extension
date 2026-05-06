@@ -252,10 +252,117 @@ async function handleCaptcha() {
 
         const notice = document.createElement('div');
         notice.id = 'scraper-notice';
-        notice.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #6366f1; color: white; padding: 24px; border-radius: 12px; z-index: 10000; box-shadow: 0 10px 25px rgba(0,0,0,0.5); font-family: sans-serif; max-width: 320px; border: 1px solid rgba(255,255,255,0.2);';
+        notice.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #161a23;
+            color: #f8fafc;
+            padding: 0;
+            border-radius: 14px;
+            z-index: 10000;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            max-width: 340px;
+            width: 340px;
+            border: 1px solid #2d333f;
+            border-top: 3px solid #f59e0b;
+            overflow: hidden;
+            animation: scraperNoticeIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        `;
+
+        // Add keyframes for entrance animation
+        if (!document.getElementById('scraper-notice-styles')) {
+            const styleSheet = document.createElement('style');
+            styleSheet.id = 'scraper-notice-styles';
+            styleSheet.textContent = `
+                @keyframes scraperNoticeIn {
+                    from { opacity: 0; transform: translateY(-16px) scale(0.96); }
+                    to { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                @keyframes scraperPulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                }
+                #scraper-notice .notice-icon {
+                    width: 44px;
+                    height: 44px;
+                    border-radius: 50%;
+                    background: rgba(245, 158, 11, 0.12);
+                    border: 1px solid rgba(245, 158, 11, 0.25);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-shrink: 0;
+                    color: #f59e0b;
+                    animation: scraperPulse 2s ease-in-out infinite;
+                }
+                #scraper-notice .notice-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 14px;
+                    padding: 20px 20px 0;
+                }
+                #scraper-notice .notice-header h3 {
+                    margin: 0;
+                    font-family: 'Outfit', 'Segoe UI', sans-serif;
+                    font-size: 16px;
+                    font-weight: 700;
+                    color: #f8fafc;
+                    letter-spacing: -0.3px;
+                }
+                #scraper-notice .notice-body {
+                    padding: 10px 20px 20px;
+                    margin-left: 58px;
+                }
+                #scraper-notice .notice-body p {
+                    margin: 0;
+                    font-size: 13px;
+                    color: #94a3b8;
+                    line-height: 1.5;
+                }
+                #scraper-notice .notice-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    margin-top: 12px;
+                    padding: 5px 10px;
+                    background: rgba(245, 158, 11, 0.08);
+                    border: 1px solid rgba(245, 158, 11, 0.15);
+                    border-radius: 6px;
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: #f59e0b;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                #scraper-notice .notice-badge .dot {
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 50%;
+                    background: #f59e0b;
+                    animation: scraperPulse 1.5s ease-in-out infinite;
+                }
+            `;
+            document.head.appendChild(styleSheet);
+        }
+
         notice.innerHTML = `
-            <h3 style="margin: 0 0 10px 0; font-family: Outfit, sans-serif;">Action Required</h3>
-            <p style="margin: 0; font-size: 14px; opacity: 0.9;">A captcha has appeared. Please solve it manually to continue scraping.</p>
+            <div class="notice-header">
+                <div class="notice-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    </svg>
+                </div>
+                <h3>Captcha Detected</h3>
+            </div>
+            <div class="notice-body">
+                <p>A captcha has appeared. Please solve it manually to continue scraping.</p>
+                <div class="notice-badge">
+                    <span class="dot"></span>
+                    Waiting for solve
+                </div>
+            </div>
         `;
         document.body.appendChild(notice);
 

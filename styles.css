@@ -209,7 +209,7 @@ input[type="text"]:not(#license-key):focus {
 button {
   flex: 1;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 12px;
   font-family: "Inter", sans-serif;
   font-weight: 600;
@@ -220,19 +220,30 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .secondary-btn {
   background: var(--bg-color);
   color: var(--text-dim);
   border: 1px solid var(--border);
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
 }
 
 .secondary-btn:hover {
   background: var(--card-bg);
   color: var(--text-main);
-  border-color: var(--text-dim);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.secondary-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
 }
 
 .settings-section {
@@ -460,7 +471,7 @@ details.settings-section {
   background: var(--bg-color);
   border: 1px solid var(--border);
   border-radius: 8px;
-  margin-top: 16px;
+  margin-top: 8px;
   margin-bottom: 0px;
   padding: 0;
   overflow: hidden;
@@ -510,8 +521,8 @@ details.settings-section .settings-content {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
-  margin-top: 16px;
-  margin-bottom: 16px;
+  margin-top: 12px;
+  margin-bottom: 8px;
 }
 
 .portals-grid .secondary-btn {
@@ -572,49 +583,71 @@ details.settings-section .settings-content {
 
 /* --- PREMIUM UI REFINEMENTS --- */
 .primary-btn {
-  background: var(--accent);
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
   color: white;
-  border: 1px solid var(--accent);
+  border: 1px solid transparent;
+  transition: all 0.25s ease;
 }
 .primary-btn:hover {
-  background: var(--accent-hover);
+  background: linear-gradient(135deg, #5a5ae6 0%, #4338ca 100%);
   transform: translateY(-1px);
+}
+.primary-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
 }
 
 .danger-btn {
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(239, 68, 68, 0.08);
   color: var(--error);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  transition: all 0.25s ease;
 }
 .danger-btn:hover {
   background: var(--error);
   color: white;
+  border-color: var(--error);
   transform: translateY(-1px);
+}
+.danger-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  background: #dc2626;
 }
 
 .warning-btn {
-  background: rgba(245, 158, 11, 0.1);
+  background: rgba(245, 158, 11, 0.08);
   color: var(--warning);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  transition: all 0.25s ease;
 }
 .warning-btn:hover {
   background: var(--warning);
   color: white;
+  border-color: var(--warning);
   transform: translateY(-1px);
+}
+.warning-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  background: #d97706;
 }
 
 .success-btn {
-  background: rgba(16, 185, 129, 0.1);
+  background: rgba(16, 185, 129, 0.08);
   color: var(--success);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  border: 1px solid rgba(16, 185, 129, 0.2);
   margin-top: 12px;
   width: 100%;
+  transition: all 0.25s ease;
 }
 .success-btn:hover:not(:disabled) {
   background: var(--success);
   color: white;
+  border-color: var(--success);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+.success-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  background: #059669;
 }
 .success-btn:disabled {
   opacity: 0.4;
@@ -631,14 +664,30 @@ details.settings-section .settings-content {
   background: var(--card-bg);
   border: 1px solid var(--border);
   color: var(--text-dim);
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+.portal-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
 }
 .portal-btn:hover {
-  border-color: var(--accent);
+  border-color: rgba(99, 102, 241, 0.4);
   color: var(--accent);
-  background: rgba(99, 102, 241, 0.05);
+  transform: translateY(-1px);
+}
+.portal-btn:hover::after {
+  opacity: 1;
+}
+.portal-btn:active {
+  transform: translateY(0) scale(0.97);
 }
 
 .view-title {
@@ -706,8 +755,8 @@ svg {
 }
 
 #initial-btns .primary-btn {
-  flex: 1.5; /* Makes it wider */
-  background: #6366f1;
+  flex: 1.5;
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
   color: white;
   border-radius: 10px;
   border: none;
@@ -719,7 +768,7 @@ svg {
   text-align: left;
   line-height: 1.2;
   font-weight: 600;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
 }
 
 #initial-btns .primary-btn span {
@@ -728,14 +777,19 @@ svg {
 }
 
 #initial-btns .primary-btn:hover {
-  background: #5a5ae6;
+  background: linear-gradient(135deg, #5a5ae6 0%, #4338ca 100%);
   transform: translateY(-1px);
+}
+
+#initial-btns .primary-btn:active {
+  transform: translateY(0) scale(0.98);
+  background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
 }
 
 #initial-btns .secondary-btn,
 #initial-btns .danger-btn {
-  flex: 1; /* Makes them smaller */
-  background: #161821; /* Match form background */
+  flex: 1;
+  background: #161821;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   display: flex;
@@ -744,7 +798,7 @@ svg {
   gap: 6px;
   font-size: 13px;
   font-weight: 500;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
 }
 
 #initial-btns .secondary-btn {
@@ -755,6 +809,11 @@ svg {
   background: #1e202d;
   color: #f8fafc;
   border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+#initial-btns .secondary-btn:active {
+  transform: translateY(0) scale(0.97);
 }
 
 #initial-btns .danger-btn {
@@ -765,6 +824,12 @@ svg {
 #initial-btns .danger-btn:hover {
   background: rgba(239, 68, 68, 0.08);
   border-color: rgba(239, 68, 68, 0.4);
+  transform: translateY(-1px);
+}
+
+#initial-btns .danger-btn:active {
+  transform: translateY(0) scale(0.97);
+  background: rgba(239, 68, 68, 0.15);
 }
 
 /* Also enhance input fields to match dark theme premium look */
@@ -802,15 +867,15 @@ button span {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(2px);
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.25s ease;
 }
 .modal-overlay.show {
   opacity: 1;
@@ -819,27 +884,43 @@ button span {
 .custom-modal {
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 20px;
+  border-top: 3px solid var(--error);
+  border-radius: 14px;
+  padding: 28px 24px 24px;
   width: 90%;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-  transform: translateY(10px);
-  transition: transform 0.2s ease;
+  max-width: 320px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  transform: translateY(16px) scale(0.96);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   text-align: center;
 }
 .modal-overlay.show .custom-modal {
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
+}
+.modal-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  color: var(--error);
 }
 .custom-modal h3 {
-  font-size: 16px;
+  font-size: 17px;
+  font-weight: 700;
   margin-bottom: 8px;
   color: var(--text-main);
+  letter-spacing: -0.3px;
 }
 .custom-modal p {
   font-size: 13px;
   color: var(--text-dim);
-  margin-bottom: 20px;
-  line-height: 1.4;
+  margin-bottom: 24px;
+  line-height: 1.5;
 }
 .modal-btns {
   display: flex;
@@ -847,10 +928,13 @@ button span {
 }
 .modal-btns button {
   flex: 1;
-  padding: 10px;
-  border-radius: 8px;
+  padding: 11px 16px;
+  border-radius: 10px;
   font-weight: 600;
   font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 .btn-cancel {
   background: var(--bg-color);
@@ -860,6 +944,7 @@ button span {
 .btn-cancel:hover {
   background: #1e202d;
   color: var(--text-main);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 .btn-confirm {
   background: var(--error);
@@ -868,6 +953,7 @@ button span {
 }
 .btn-confirm:hover {
   background: #dc2626;
+  transform: translateY(-1px);
 }
 
 /* --- HIDE NUMBER INPUT SPINNERS --- */
