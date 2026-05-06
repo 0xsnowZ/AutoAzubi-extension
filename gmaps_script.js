@@ -84,6 +84,186 @@ async function getDasOertlicheTotal() {
     return '?';
 }
 
+function extractEmail(rawHtml) {
+    if (!rawHtml) return '';
+
+    let email = '';
+
+    // Strategy 1: href="mailto:..." on .mail anchor
+    const mailtoHref = rawHtml.match(/class="mail"[^>]*href="mailto:([^"?\s]+)"/i)
+        || rawHtml.match(/href="mailto:([^"?\s]+)"[^>]*class="mail"/i);
+    if (mailtoHref) {
+        email = mailtoHref[1].trim();
+    }
+
+    // Strategy 2: title="..." on .mail anchor
+    if (!email) {
+        const titleMatch = rawHtml.match(/class="mail"[^>]*title="([^"]+@[^"]+)"/i)
+            || rawHtml.match(/title="([^"]+@[^"]+)"[^>]*class="mail"/i);
+        if (titleMatch) email = titleMatch[1].trim();
+    }
+
+    // Strategy 3: Generic mailto: anywhere
+    if (!email) {
+        const genericMailto = rawHtml.match(/href="mailto:([^"?\s]+)"/i);
+        if (genericMailto) email = genericMailto[1].trim();
+    }
+
+    // Strategy 4: data-email attribute (common obfuscation pattern)
+    if (!email) {
+        const dataEmail = rawHtml.match(/data-email="([^"]+)"/i)
+            || rawHtml.match(/data-mail="([^"]+)"/i);
+        if (dataEmail) {
+            email = dataEmail[1].trim();
+            // Some sites encode the email with reversals or substitutions
+            email = email.replace(/\(at\)/gi, '@').replace(/\[at\]/gi, '@').replace(/\s*at\s*/gi, '@');
+            email = email.replace(/\(dot\)/gi, '.').replace(/\[dot\]/gi, '.').replace(/\s*dot\s*/gi, '.');
+        }
+    }
+
+    // Strategy 5: onclick handlers with mailto
+    if (!email) {
+        const onclickMailto = rawHtml.match(/onclick="[^"]*mailto:([^"'\s?]+)/i);
+        if (onclickMailto) email = onclickMailto[1].trim();
+    }
+
+    // Strategy 6: HTML entity encoded emails (e.g. &#109;&#97;&#105;&#108;)
+    if (!email) {
+        const entityMatch = rawHtml.match(/href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;([^"]+)"/i);
+        if (entityMatch) {
+            // Decode HTML entities
+            const textarea = document.createElement('textarea');
+            textarea.innerHTML = entityMatch[1];
+            email = textarea.value.trim();
+        }
+    }
+
+    // Strategy 7: Obfuscated emails using (at), [at], [AT], etc.
+    if (!email) {
+        const obfuscatedMatch = rawHtml.match(/[\w.\-]+\s*\[(?:at|AT)\]\s*[\w.\-]+\s*\[(?:dot|DOT)\]\s*[\w.\-]+/);
+        if (obfuscatedMatch) {
+            email = obfuscatedMatch[0].replace(/\s*\[(?:at|AT)\]\s*/g, '@').replace(/\s*\[(?:dot|DOT)\]\s*/g, '.');
+        }
+    }
+
+    // Strategy 8: Email with (at) and (dot) parentheses
+    if (!email) {
+        const parenMatch = rawHtml.match(/[\w.\-]+\s*\(at\)\s*[\w.\-]+\s*\(dot\)\s*[\w.\-]+/i);
+        if (parenMatch) {
+            email = parenMatch[0].replace(/\s*\(at\)\s*/gi, '@').replace(/\s*\(dot\)\s*/gi, '.');
+        }
+    }
+
+    // Strategy 9: Broad email regex on visible text (last resort)
+    if (!email) {
+        // Strip HTML tags to get visible text, then search for email pattern
+        const visibleText = rawHtml.replace(/<script[\s\S]*?<\/script>/gi, '')
+                                   .replace(/<style[\s\S]*?<\/style>/gi, '')
+                                   .replace(/<[^>]+>/g, ' ');
+        const emailRegex = visibleText.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+        if (emailRegex) {
+            email = emailRegex[0].trim();
+            // Filter out obviously false positives like image filenames
+            if (/\.(png|jpg|jpeg|gif|svg|css|js|woff|ttf)$/i.test(email)) {
+                email = '';
+            }
+        }
+    }
+
+    // Clean up: decode any remaining HTML entities
+    if (email && /&#\d+;|&\w+;/.test(email)) {
+        const textarea = document.createElement('textarea');
+        textarea.innerHTML = email;
+        email = textarea.value.trim();
+    }
+
+    // Final validation: must look like a real email
+    if (email && !/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(email)) {
+        email = '';
+    }
+
+    return email;
+}
+
+/**
+ * Extract website URL from DasÖrtliche detail page HTML
+ */
+function extractWebsiteUrl(rawHtml) {
+    if (!rawHtml) return '';
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(rawHtml, 'text/html');
+
+    // Strategy 1: Look for .hitlnk_www or .www links (DasÖrtliche website links)
+    const wwwLink = doc.querySelector('.hitlnk_www, .hitlnk_homepage, a.hitlnk_www_detail');
+    if (wwwLink) {
+        const href = wwwLink.getAttribute('href') || wwwLink.getAttribute('data-href') || '';
+        if (href && !href.includes('dasoertliche.de')) return href;
+    }
+
+    // Strategy 2: Look for links with "Website" or "Webseite" text
+    const allLinks = doc.querySelectorAll('a');
+    for (const link of allLinks) {
+        const text = link.textContent.trim().toLowerCase();
+        const href = link.getAttribute('href') || '';
+        if ((text.includes('website') || text.includes('webseite') || text.includes('homepage') || text.includes('www'))
+            && href.startsWith('http') && !href.includes('dasoertliche.de')) {
+            return href;
+        }
+    }
+
+    // Strategy 3: Regex on raw HTML for external URLs in specific containers
+    const urlMatch = rawHtml.match(/class="[^"]*(?:www|homepage|website)[^"]*"[^>]*href="(https?:\/\/(?!www\.dasoertliche\.de)[^"]+)"/i);
+    if (urlMatch) return urlMatch[1];
+
+    // Strategy 4: Look for external links in the detail content area
+    const detailContent = doc.querySelector('.detail, .detailblock, #detail');
+    if (detailContent) {
+        const extLink = detailContent.querySelector('a[href^="http"]:not([href*="dasoertliche.de"])');
+        if (extLink) return extLink.getAttribute('href');
+    }
+
+    return '';
+}
+
+/**
+ * Crawl a company's website to find email from Impressum/Kontakt pages
+ * German law requires Impressum with contact email
+ */
+async function crawlWebsiteForEmail(websiteUrl) {
+    if (!websiteUrl) return '';
+
+    try {
+        // Normalize URL
+        let baseUrl = websiteUrl.replace(/\/+$/, '');
+
+        // Try the 3 most common German contact page paths (covers ~95% of cases)
+        // No sleep between attempts — network round-trip is already a natural delay
+        const contactPaths = ['/impressum', '/kontakt', '/imprint'];
+
+        for (const path of contactPaths) {
+            if (!isScraping) break;
+
+            const contactUrl = baseUrl + path;
+            console.log(`Trying contact page: ${contactUrl}`);
+
+            const resp = await chrome.runtime.sendMessage({ action: 'fetch_text_utf8', url: contactUrl });
+            if (resp && resp.success && resp.text) {
+                const email = extractEmail(resp.text);
+                if (email) {
+                    console.log(`Found email on ${contactUrl}: ${email}`);
+                    return email;
+                }
+            }
+        }
+
+    } catch (e) {
+        console.error('Error crawling website for email:', e);
+    }
+
+    return '';
+}
+
 async function startScraping() {
     const { keyword, city } = extractKwAndCity();
 
@@ -142,11 +322,6 @@ async function startScraping() {
             if (!isScraping || isPaused) break;
             if (scrapedData.length >= targetLimit) break;
 
-            // Only fetch detail page if the list page shows a mail button
-            // This avoids fetching hundreds of detail pages with no email
-            const mailBtn = hit.querySelector('.hitlnk_mail, .hitlnk_mail_detail');
-            if (!mailBtn) continue;
-
             const nameLink = hit.querySelector('.hitlnk_name');
             if (!nameLink) continue;
 
@@ -165,35 +340,24 @@ async function startScraping() {
                     detailUrl = 'https://www.dasoertliche.de' + (detailUrl.startsWith('/') ? '' : '/') + detailUrl;
                 }
 
-                await sleep(200); // Small delay between detail fetches
+                await sleep(100); // Small delay between detail fetches
 
                 console.log(`Fetching detail page: ${detailUrl}`);
                 const detailResp = await chrome.runtime.sendMessage({ action: 'fetch_text', url: detailUrl });
                 if (detailResp && detailResp.success) {
                     const rawHtml = detailResp.text;
 
-                    // Extract email from raw HTML:
-                    // 1. Try href="mailto:..." on .mail anchor
-                    // 2. Try title="..." on .mail anchor
-                    // 3. Fallback: plain email regex on raw HTML
-                    let email = '';
+                    // Extract email from DasÖrtliche detail page using multiple strategies
+                    let email = extractEmail(rawHtml);
 
-                    const mailtoHref = rawHtml.match(/class="mail"[^>]*href="mailto:([^"?\s]+)"/i)
-                        || rawHtml.match(/href="mailto:([^"?\s]+)"[^>]*class="mail"/i);
-                    if (mailtoHref) {
-                        email = mailtoHref[1].trim();
-                    }
-
+                    // If no email found on DasÖrtliche, try crawling the company's website
                     if (!email) {
-                        const titleMatch = rawHtml.match(/class="mail"[^>]*title="([^"@\s]+@[^"@\s]+)"/i)
-                            || rawHtml.match(/title="([^"@\s]+@[^"@\s]+)"[^>]*class="mail"/i);
-                        if (titleMatch) email = titleMatch[1].trim();
-                    }
-
-                    if (!email) {
-                        // Generic mailto: fallback
-                        const genericMailto = rawHtml.match(/href="mailto:([^"?\s]+)"/i);
-                        if (genericMailto) email = genericMailto[1].trim();
+                        const websiteUrl = extractWebsiteUrl(rawHtml);
+                        if (websiteUrl) {
+                            console.log(`No email on DasÖrtliche. Crawling website: ${websiteUrl}`);
+                            await sleep(100);
+                            email = await crawlWebsiteForEmail(websiteUrl);
+                        }
                     }
 
                     if (email) {
@@ -207,7 +371,7 @@ async function startScraping() {
                         chrome.storage.local.set({ scrapedData });
                         chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length });
                     } else {
-                        console.log("No email found in detail page for:", company);
+                        console.log("No email found for:", company);
                     }
                 }
             }
@@ -231,7 +395,7 @@ async function startScraping() {
             currentPageUrl = null;
         }
 
-        await sleep(500); // Delay between pages
+        await sleep(200); // Delay between pages
     }
 
     if (isScraping && !isPaused && (scrapedData.length >= targetLimit || !currentPageUrl)) {

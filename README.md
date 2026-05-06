@@ -22,7 +22,7 @@ A Chrome extension that automatically scrapes Ausbildung (apprenticeship) job li
 2. Open Chrome and go to `chrome://extensions/`
 3. Enable **Developer mode** (top-right toggle)
 4. Click **Load unpacked**
-5. Select the `scraping extension/` folder
+5. Select the `scrabb extension/` folder
 6. The extension icon will appear in your toolbar
 
 ---
@@ -34,7 +34,7 @@ A Chrome extension that automatically scrapes Ausbildung (apprenticeship) job li
 1. Click the extension icon
 2. Click **Open Arbeitsagentur** — it opens the job search page
 3. Navigate to a search results page (Ausbildung listings)
-4. Click **Count Available** to see how many results are on the page
+4. Click **Count** to see how many results are on the page
 5. Set your **Target Number of Offers**
 6. Click **Start Scraping**
 7. If a captcha appears, solve it manually — the scraper will resume automatically
@@ -69,11 +69,18 @@ A Chrome extension that automatically scrapes Ausbildung (apprenticeship) job li
 
 ### Google Maps / DasÖrtliche (Business Directory)
 
-1. Click **Open Google Maps** from the popup
-2. Enter a **Keyword** (business type) and a **City**
-3. Click **Search on Maps** — a Google Maps search tab opens
+1. Click the **Google Maps** tab in the popup
+2. Enter a **Keyword** (business type) and a **City / Location**
+3. Click **Search on Maps** — a DasÖrtliche search opens in a new tab
 4. Go back to the extension popup and click **Start Scraping**
-5. The extension scrapes matching businesses from DasÖrtliche.de in the background
+5. The extension scrapes all matching businesses from DasÖrtliche.de in the background
+
+**Email extraction strategy (multi-step):**
+
+1. Checks DasÖrtliche detail page for email (9 extraction patterns including obfuscated/encoded emails)
+2. If no email found, extracts the company's website URL from the detail page
+3. Crawls the company's `/impressum`, `/kontakt`, and `/imprint` pages (German law requires contact email in Impressum)
+4. Only saves businesses where an email was successfully found
 
 **Good keywords for IT/tech apprenticeships:**
 
@@ -83,22 +90,21 @@ A Chrome extension that automatically scrapes Ausbildung (apprenticeship) job li
 
 - `SHK`, `Sanitär`, `Heizungsbau`, `Klempner`, `Haustechnik`, `Installateur`
 
-> The scraper only collects businesses that have a **publicly visible email** on DasÖrtliche.
-> Categories with high email publication rates (e.g. Altenheim, Arzt) will complete faster than categories where businesses rarely publish emails (e.g. Softwareentwicklung).
+> Categories where businesses regularly publish emails (e.g. Arzt, Altenheim) will complete faster than categories with low email publication rates (e.g. Softwareentwicklung). The Impressum crawling fallback significantly increases results for the latter.
 
 ---
 
 ## Controls
 
-| Button              | Action                                                       |
-| ------------------- | ------------------------------------------------------------ |
-| **Count Available** | Applies filters and counts total results on the current page |
-| **Start Scraping**  | Begins extraction up to the target number                    |
-| **Pause**           | Pauses after the current item (resumes from exact position)  |
-| **Resume**          | Continues from where it paused                               |
-| **Stop**            | Stops scraping and keeps collected data                      |
-| **Reset**           | Clears all collected data                                    |
-| **Download CSV**    | Exports all scraped data as a deduplicated `.csv` file       |
+| Button             | Action                                                      |
+| ------------------ | ----------------------------------------------------------- |
+| **Start Scraping** | Begins extraction up to the target number                   |
+| **Count**          | Counts total available results on the current page          |
+| **Reset**          | Clears all collected data (with confirmation dialog)        |
+| **Pause**          | Pauses after the current item (resumes from exact position) |
+| **Resume**         | Continues from where it paused                              |
+| **Stop**           | Stops scraping and keeps collected data                     |
+| **Download CSV**   | Exports all scraped data as a deduplicated `.csv` file      |
 
 ---
 
@@ -135,17 +141,17 @@ The popup UI supports **English** and **Arabic (RTL)** — toggle with the EN / 
 ## File Structure
 
 ```
-scraping extension/
+scrabb extension/
 ├── manifest.json           # Extension manifest (MV3)
 ├── popup.html              # Popup UI
 ├── popup.js                # Popup logic, i18n, CSV export (with deduplication)
 ├── styles.css              # Popup styles
-├── background.js           # Service worker (fetch proxy for DasÖrtliche ISO-8859-1 decoding)
+├── background.js           # Service worker (ISO-8859-1 fetch proxy for DasÖrtliche + UTF-8 fetch proxy for external websites)
 ├── content_script.js       # Scraper for arbeitsagentur.de
 ├── ausbildung_script.js    # Scraper for ausbildung.de (URL-based pagination)
 ├── aubiplus_script.js      # Scraper for aubi-plus.de
 ├── azubi_script.js         # Scraper for azubi.de (URL-based pagination)
-├── gmaps_script.js         # Scraper for DasÖrtliche.de (via Google Maps tab)
+├── gmaps_script.js         # Scraper for DasÖrtliche.de with Impressum/Kontakt crawling fallback
 ├── captcha.mp3             # Captcha alert sound
 ├── finished.mp3            # Completion sound
 └── icons/
@@ -159,9 +165,11 @@ scraping extension/
 ## Technical Notes
 
 - **Pagination**: ausbildung.de and azubi.de use URL-based pagination (`?page=N`) — the scraper fetches pages directly via `fetch()` with session cookies, no DOM clicking required
-- **Email extraction**: Uses regex on raw HTML to avoid `DOMParser` resolving `mailto:` links to `chrome-extension://` URLs
+- **Email extraction**: Uses 9 regex strategies on raw HTML to handle plain, obfuscated (`[at]`, `(dot)`), entity-encoded, `data-email`, and `onclick`-embedded emails. Avoids `DOMParser` resolving `mailto:` links to `chrome-extension://` URLs
+- **Impressum crawling**: When no email is found on DasÖrtliche, the scraper extracts the company's website URL and fetches `/impressum`, `/kontakt`, and `/imprint` pages with a 5-second timeout per request
 - **Address extraction**: Uses JSON-LD structured data (`application/ld+json`) as primary source, with DOM selector fallbacks
 - **Deduplication**: CSV export deduplicates by email (case-insensitive); entries without email are deduplicated by company+address
-- **Delays**: 200–500ms between requests to avoid rate limiting
+- **Request delays**: 100ms between detail page fetches, 200ms between list pages — network round-trip provides natural throttling for website crawling
+- **Fetch timeout**: External website fetches abort after 5 seconds to avoid blocking on slow/unresponsive sites
 - **State persistence**: Scraped data is stored in `chrome.storage.local` — data survives popup close/reopen
-- **DasÖrtliche**: Scraping runs entirely in the background via the service worker fetch proxy (required for ISO-8859-1 encoding support)
+- **DasÖrtliche encoding**: Scraping runs via the service worker fetch proxy (required for ISO-8859-1 encoding support); external website crawling uses a separate UTF-8 fetch proxy
