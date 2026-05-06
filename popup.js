@@ -359,7 +359,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       activityLog.classList.add("active");
       statusCard.classList.add("running");
       progressBar.classList.add("progress-striped");
-      if (activityLog.innerText === "Ready to start..." || activityLog.innerText === "Ready to download.") {
+      if (
+        activityLog.innerText === "Ready to start..." ||
+        activityLog.innerText === "Ready to download."
+      ) {
         activityLog.innerText = "Extracting data...";
       }
     } else if (status === "paused") {
@@ -412,7 +415,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           sendMessageToTab({ action: "countResults" }, (countResponse) => {
             if (countResponse && countResponse.total !== undefined) {
               totalDisplay.innerText = countResponse.total;
-              limitInput.value = Math.min(parseInt(limitInput.value), countResponse.total);
+              limitInput.value = Math.min(
+                parseInt(limitInput.value),
+                countResponse.total,
+              );
             }
           });
         }
