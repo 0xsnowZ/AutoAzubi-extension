@@ -277,6 +277,7 @@
             type="text"
             id="gmaps-keyword"
             placeholder="Enter keyword..."
+            data-i18n-placeholder="gmapsKwPlaceholder"
             class="input-field"
           />
         </div>
@@ -286,6 +287,7 @@
             type="text"
             id="gmaps-city"
             placeholder="Enter city..."
+            data-i18n-placeholder="gmapsCityPlaceholder"
             class="input-field"
           />
         </div>
@@ -314,17 +316,39 @@
     <div class="modal-overlay" id="confirmModal">
       <div class="custom-modal">
         <div class="modal-icon">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+            ></path>
             <line x1="12" y1="9" x2="12" y2="13"></line>
             <line x1="12" y1="17" x2="12.01" y2="17"></line>
           </svg>
         </div>
-        <h3>Clear Data</h3>
-        <p>Are you sure you want to clear all scraped data? This action cannot be undone.</p>
+        <h3 data-i18n="modalTitle">Clear Data</h3>
+        <p data-i18n="modalDesc">
+          Are you sure you want to clear all scraped data? This action cannot be
+          undone.
+        </p>
         <div class="modal-btns">
-          <button id="modalCancel" class="btn-cancel">Cancel</button>
-          <button id="modalConfirm" class="btn-confirm">Clear All</button>
+          <button id="modalCancel" class="btn-cancel" data-i18n="modalCancel">
+            Cancel
+          </button>
+          <button
+            id="modalConfirm"
+            class="btn-confirm"
+            data-i18n="modalConfirm"
+          >
+            Clear All
+          </button>
         </div>
       </div>
     </div>

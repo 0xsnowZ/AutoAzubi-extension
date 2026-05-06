@@ -101,10 +101,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       gmapsCityParams: "City / Location",
       gmapsSearchBtn: "Search on Maps",
       gmapsBackBtn: "Back",
+      modalTitle: "Clear Data",
+      modalDesc:
+        "Are you sure you want to clear all scraped data? This action cannot be undone.",
+      modalCancel: "Cancel",
+      modalConfirm: "Clear All",
+      gmapsKwPlaceholder: "Enter keyword...",
+      gmapsCityPlaceholder: "Enter city...",
     },
     ar: {
       titleText: "AutoAzubi Extractor",
-      subtitleText: "أداة الاستخراج المميزة",
+      subtitleText: "أداة استخراج البيانات الآلية",
       statusTitle: "الحالة الحالية",
       statusIdle: "خامل",
       statusFinished: "مكتمل",
@@ -114,11 +121,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       countBtn: "حساب",
       startBtn: "بدء\nالاستخراج",
       resetBtn: "إعادة ضبط",
-      arbBtn: "انتقل إلى Arbeitsagentur",
-      ausBtn: "اذهب إلى Ausbildung.de",
-      aubiBtn: "اذهب إلى Aubi-Plus.de",
+      arbBtn: "افتح Arbeitsagentur",
+      ausBtn: "افتح Ausbildung.de",
+      aubiBtn: "افتح Aubi-Plus.de",
       azubiBtn: "افتح Azubi.de",
-      gmapsBtn: "الذهاب إلى خرائط جوجل",
+      gmapsBtn: "افتح خرائط جوجل",
       pauseBtn: "إيقاف مؤقت",
       resumeBtn: "استئناف",
       stopBtn: "إيقاف",
@@ -133,11 +140,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       applyingFilters: "جارِ تطبيق الفلاتر...",
       refreshPage: "يرجى تحديث الصفحة",
       waitingCaptcha: "في انتظار الكابتشا",
-      gmapsTitle: "استخراج من خرائط جوجل",
+      gmapsTitle: "مستخرج خرائط جوجل",
       gmapsKwParams: "الكلمة المفتاحية",
       gmapsCityParams: "المدينة / الموقع",
       gmapsSearchBtn: "البحث في الخرائط",
       gmapsBackBtn: "رجوع",
+      modalTitle: "مسح البيانات",
+      modalDesc: "هل أنت متأكد أنك تريد مسح جميع البيانات المستخرجة؟ لا يمكن التراجع عن هذا الإجراء.",
+      modalCancel: "إلغاء",
+      modalConfirm: "مسح الكل",
+      gmapsKwPlaceholder: "أدخل الكلمة المفتاحية...",
+      gmapsCityPlaceholder: "أدخل المدينة...",
     },
   };
 
@@ -150,6 +163,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       const key = el.getAttribute("data-i18n");
       if (i18n[lang][key]) {
         el.innerText = i18n[lang][key];
+      }
+    });
+
+    // Translate placeholders
+    document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+      const key = el.getAttribute("data-i18n-placeholder");
+      if (i18n[lang][key]) {
+        el.placeholder = i18n[lang][key];
       }
     });
 
