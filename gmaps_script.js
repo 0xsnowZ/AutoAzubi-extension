@@ -271,6 +271,7 @@ async function startScraping() {
         console.error('[GMaps] Scraping error:', err);
         isScraping = false;
         isPaused = false;
+        chrome.storage.local.set({ isScraping: false, isPaused: false });
         chrome.runtime.sendMessage({ action: 'error', message: String(err) });
     }
 }
@@ -414,6 +415,7 @@ async function _startScraping() {
         if (settings.notifyFinish) finishedSound.play().catch(e => console.error("Audio play error", e));
         isScraping = false;
         isPaused = false;
+        chrome.storage.local.set({ isScraping: false, isPaused: false });
         chrome.runtime.sendMessage({ action: 'finished', count: scrapedData.length });
     }
 }

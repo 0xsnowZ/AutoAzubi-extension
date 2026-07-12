@@ -214,6 +214,7 @@ async function handleSearchPage(limit = 50) {
     }
     isScraping = false;
     isPaused = false;
+    chrome.storage.local.set({ isScraping: false, isPaused: false });
 }
 
 // Wrap with error propagation
@@ -225,6 +226,7 @@ handleSearchPage = async function(limit) {
         console.error('[AubiPlus] Scraping error:', err);
         isScraping = false;
         isPaused = false;
+        chrome.storage.local.set({ isScraping: false, isPaused: false });
         chrome.runtime.sendMessage({ action: 'error', message: String(err) });
     }
 };

@@ -300,6 +300,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (result.isScraping) {
           updateUI(result.isPaused ? "paused" : "running");
+        } else if (result.scrapedData && result.scrapedData.length > 0) {
+          updateUI("finished");
         } else {
           updateUI("idle");
         }
@@ -515,6 +517,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         if (response.isScraping)
           updateUI(response.isPaused ? "paused" : "running");
+        else if (response.scrapedCount > 0)
+          updateUI("finished");
+        else
+          updateUI("idle");
 
         // Auto-count total if not provided by getInitialInfo and not already scraping
         if (!response.total && !response.isScraping) {
