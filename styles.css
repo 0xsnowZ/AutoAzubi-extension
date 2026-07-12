@@ -215,6 +215,33 @@ body[dir="rtl"] { font-family: "Cairo", sans-serif; }
   margin-bottom: 5px;
 }
 
+.status-value-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* Pulse dot — hidden by default, shown when running */
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-2);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.pulse-dot.active {
+  opacity: 1;
+  animation: pulse-ring 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse-ring {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.7); }
+}
+
 .status-value {
   font-size: 15px;
   font-weight: 700;
@@ -240,6 +267,31 @@ body[dir="rtl"] { font-family: "Cairo", sans-serif; }
 }
 
 .activity-log.active { display: block; }
+
+/* Active site badge — shows which portal the user is on */
+.active-site-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+  padding: 3px 8px;
+  background: rgba(99,102,241,0.08);
+  border: 1px solid rgba(99,102,241,0.18);
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent-2);
+  letter-spacing: 0.3px;
+}
+
+.active-site-badge::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent-2);
+  flex-shrink: 0;
+}
 
 .status-right {
   text-align: right;
@@ -276,6 +328,27 @@ body[dir="rtl"] { font-family: "Cairo", sans-serif; }
 /* ── Progress Bar ──────────────────────────────────── */
 .progress-wrap { display: none; }
 .progress-wrap.active { display: block; }
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.progress-label {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+}
+
+.progress-pct {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--accent-2);
+  font-family: "Outfit", sans-serif;
+}
 
 .progress-track {
   width: 100%;
@@ -541,6 +614,15 @@ input::placeholder { color: var(--text-muted); }
   transform: translateY(-1px);
 
 }
+
+/* Active portal: user is on this portal's tab */
+.portal-btn.portal-active {
+  border-color: rgba(99,102,241,0.35);
+  color: var(--accent-2);
+  background: rgba(99,102,241,0.07);
+}
+
+.portal-btn.portal-active .portal-icon { opacity: 1; }
 
 .portal-btn:hover::after { opacity: 1; }
 .portal-btn:active { transform: translateY(0) scale(0.97); }

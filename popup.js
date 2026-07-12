@@ -42,12 +42,64 @@ document.addEventListener("DOMContentLoaded", async () => {
   const progressContainer = document.getElementById("progress-container");
   const activityLog = document.getElementById("activity-log");
   const statusCard = document.getElementById("status-card");
+  const pulseDot = document.getElementById("pulse-dot");
+  const progressPct = document.getElementById("progress-pct");
+  const activeSiteBadge = document.getElementById("active-site-badge");
 
   function updateProgress() {
     let current = parseInt(countDisplay.innerText) || 0;
     let target = limitInput.value ? parseInt(limitInput.value) : 1;
     let percent = Math.min((current / target) * 100, 100);
     progressBar.style.width = percent + "%";
+    if (progressPct) progressPct.innerText = Math.round(percent) + "%";
+  }
+
+  // Smooth count-up animation
+  function animateCount(el, to) {
+    const from = parseInt(el.innerText) || 0;
+    if (from === to) return;
+    const duration = 400;
+    const steps = Math.min(Math.abs(to - from), 20);
+    const stepTime = duration / steps;
+    let current = from;
+    const inc = (to - from) / steps;
+    const timer = setInterval(() => {
+      current += inc;
+      el.innerText = Math.round(current);
+      if ((inc > 0 && current >= to) || (inc < 0 && current <= to)) {
+        el.innerText = to;
+        clearInterval(timer);
+      }
+    }, stepTime);
+  }
+
+  // Detect which portal (if any) the active tab belongs to and highlight it
+  function detectActivePortal(url) {
+    const map = [
+      { id: "arbeitsagentur-btn", test: (u) => u.includes("arbeitsagentur.de") },
+      { id: "ausbildung-btn",     test: (u) => u.includes("ausbildung.de") },
+      { id: "aubiplus-btn",       test: (u) => u.includes("aubi-plus.de") },
+      { id: "azubi-btn",          test: (u) => u.includes("azubi.de") },
+    ];
+    let matched = null;
+    map.forEach(({ id, test }) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      if (url && test(url)) {
+        btn.classList.add("portal-active");
+        matched = btn.querySelector("span")?.innerText || id;
+      } else {
+        btn.classList.remove("portal-active");
+      }
+    });
+    if (activeSiteBadge) {
+      if (matched) {
+        activeSiteBadge.innerText = matched;
+        activeSiteBadge.classList.remove("hidden");
+      } else {
+        activeSiteBadge.classList.add("hidden");
+      }
+    }
   }
 
   // GMaps UI Elements
@@ -370,6 +422,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     statusText.className = `status-value status-${status}`;
 
+    // Pulse dot: only visible when actively running
+    if (pulseDot) {
+      pulseDot.classList.toggle("active", status === "running");
+      pulseDot.style.background =
+        status === "paused" ? "var(--warning)" : "var(--accent-2)";
+    }
+
     if (status === "running") {
       initialBtns.classList.add("hidden");
       ongoingBtns.classList.remove("hidden");
@@ -406,17 +465,33 @@ document.addEventListener("DOMContentLoaded", async () => {
         progressBar.classList.remove("progress-striped");
         activityLog.innerText = "Ready to download.";
         progressBar.style.width = "100%";
+        if (progressPct) progressPct.innerText = "100%";
       } else {
         progressContainer.classList.remove("active");
         activityLog.classList.remove("active");
         progressBar.style.width = "0%";
+        if (progressPct) progressPct.innerText = "0%";
         activityLog.innerText = "Ready to start...";
+      }
+    }
+
+    // Download button label
+    const count = parseInt(countDisplay.innerText) || 0;
+    if (downloadBtn) {
+      const span = downloadBtn.querySelector("span[data-i18n]");
+      if (span) {
+        span.innerText = count > 0
+          ? i18n[currentLang]["downloadBtn"]
+          : (currentLang === "ar" ? "لا توجد بيانات بعد" : "No data yet");
       }
     }
   }
 
   // Get initial info about total offers
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+  // Highlight the portal matching the current tab
+  detectActivePortal(tab ? tab.url : "");
 
   // Auto-navigate removed based on user request
 
@@ -587,17 +662,23 @@ document.addEventListener("DOMContentLoaded", async () => {
         statusText.innerText = i18n[currentLang]["waitingCaptcha"];
         activityLog.innerText = "Captcha detected... Please solve.";
       } else {
-        countDisplay.innerText = request.count;
+        animateCount(countDisplay, request.count);
         if (request.currentTitle) {
           activityLog.innerText = `Extracted: ${request.currentTitle}`;
         }
-        updateProgress();
+        // Update progress after animation settles
+        setTimeout(updateProgress, 420);
         downloadBtn.disabled = false;
+        // Update download button label live
+        const span = downloadBtn.querySelector("span[data-i18n]");
+        if (span) span.innerText = i18n[currentLang]["downloadBtn"];
       }
     } else if (request.action === "finished") {
-      updateUI("finished");
-      countDisplay.innerText = request.count;
-      updateProgress();
+      animateCount(countDisplay, request.count);
+      setTimeout(() => {
+        updateUI("finished");
+        updateProgress();
+      }, 420);
       downloadBtn.disabled = false;
     }
   });

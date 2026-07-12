@@ -57,8 +57,12 @@
         <div class="status-card" id="status-card">
           <div class="status-left">
             <span class="status-label" data-i18n="statusTitle">Current Status</span>
-            <div id="status-text" class="status-value status-idle" data-i18n="statusIdle">Idle</div>
+            <div class="status-value-row">
+              <span class="pulse-dot" id="pulse-dot"></span>
+              <div id="status-text" class="status-value status-idle" data-i18n="statusIdle">Idle</div>
+            </div>
             <div id="activity-log" class="activity-log">Ready to start...</div>
+            <div id="active-site-badge" class="active-site-badge hidden"></div>
           </div>
           <div class="status-right">
             <div class="counter-block">
@@ -72,6 +76,10 @@
 
         <!-- Progress Bar -->
         <div class="progress-wrap" id="progress-container">
+          <div class="progress-header">
+            <span class="progress-label">Progress</span>
+            <span class="progress-pct" id="progress-pct">0%</span>
+          </div>
           <div class="progress-track">
             <div class="progress-fill" id="progress-bar"></div>
           </div>
@@ -137,25 +145,25 @@
           <!-- Portals grid -->
           <div class="section-label">Open Portal</div>
           <div class="portals-grid" id="navigation-btns">
-            <button id="arbeitsagentur-btn" class="portal-btn" data-i18n="arbBtn">
+            <button id="arbeitsagentur-btn" class="portal-btn" title="arbeitsagentur.de">
               <svg class="portal-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
               </svg>
               <span>Arbeitsagentur</span>
             </button>
-            <button id="ausbildung-btn" class="portal-btn" data-i18n="ausBtn">
+            <button id="ausbildung-btn" class="portal-btn" title="ausbildung.de">
               <svg class="portal-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
               </svg>
               <span>Ausbildung.de</span>
             </button>
-            <button id="aubiplus-btn" class="portal-btn" data-i18n="aubiBtn">
+            <button id="aubiplus-btn" class="portal-btn" title="aubi-plus.de">
               <svg class="portal-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
               </svg>
               <span>Aubi-Plus.de</span>
             </button>
-            <button id="azubi-btn" class="portal-btn" data-i18n="azubiBtn">
+            <button id="azubi-btn" class="portal-btn" title="azubi.de">
               <svg class="portal-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
               </svg>
