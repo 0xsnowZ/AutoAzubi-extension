@@ -52,6 +52,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     let percent = Math.min((current / target) * 100, 100);
     progressBar.style.width = percent + "%";
     if (progressPct) progressPct.innerText = Math.round(percent) + "%";
+    // Compact the counter font when numbers are long
+    const counterBlock = countDisplay.closest(".counter-block");
+    if (counterBlock) {
+      const totalLen = (totalDisplay.innerText || "").length;
+      counterBlock.classList.toggle("compact", totalLen >= 4);
+    }
   }
 
   // Smooth count-up animation
@@ -498,7 +504,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (tab && tab.id && isUrlValid(tab.url)) {
     sendMessageToTab({ action: "getInitialInfo" }, (response) => {
       if (response) {
-        if (response.total) totalDisplay.innerText = response.total;
+        if (response.total) {
+          totalDisplay.innerText = response.total;
+          updateProgress();
+        }
         if (response.scrapedCount !== undefined) {
           countDisplay.innerText = response.scrapedCount;
           updateProgress();
@@ -515,6 +524,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 parseInt(limitInput.value),
                 countResponse.total,
               );
+              updateProgress();
             }
           });
         }
@@ -532,6 +542,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (response && response.total !== undefined) {
         totalDisplay.innerText = response.total;
         limitInput.value = Math.min(parseInt(limitInput.value), response.total);
+        updateProgress();
       }
     });
   });
