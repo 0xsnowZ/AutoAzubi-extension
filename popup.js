@@ -368,7 +368,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       statusText.innerText = i18n[currentLang]["statusFinished"];
     else statusText.innerText = i18n[currentLang]["statusIdle"];
 
-    statusText.className = `status-${status}`;
+    statusText.className = `status-value status-${status}`;
 
     if (status === "running") {
       initialBtns.classList.add("hidden");

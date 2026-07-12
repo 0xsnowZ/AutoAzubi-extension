@@ -1,354 +1,291 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <title>AutoAzubi Extractor</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
 
   <body>
-    <div class="container">
-      <header>
-        <h1 data-i18n="titleText">AutoAzubi Extractor</h1>
-        <p class="subtitle" data-i18n="subtitleText">
-          Automated Data Extractor
-        </p>
+    <div class="shell">
+
+      <!-- ── Header ──────────────────────────────────── -->
+      <header class="app-header">
+        <div class="header-brand">
+          <div class="brand-icon">
+            <img src="icons/icon48.png" width="24" height="24" alt="AutoAzubi logo" />
+          </div>
+          <div class="brand-text">
+            <h1 data-i18n="titleText">AutoAzubi Extractor</h1>
+            <p class="subtitle" data-i18n="subtitleText">Automated Data Extractor</p>
+          </div>
+        </div>
         <div class="lang-toggle">
           <button id="lang-en" class="lang-btn active">EN</button>
           <button id="lang-ar" class="lang-btn">عربي</button>
         </div>
       </header>
 
-      <!-- Tabs Navigation -->
-      <div class="tabs">
-        <button id="tab-jobs" class="tab-btn active">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
+      <!-- ── Tabs ────────────────────────────────────── -->
+      <nav class="tabs" role="tablist">
+        <button id="tab-jobs" class="tab-btn active" role="tab">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
             <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
           </svg>
-          <span style="margin-left: 4px" data-i18n="tabJobs">Job Portals</span>
+          <span data-i18n="tabJobs">Job Portals</span>
         </button>
-        <button id="tab-gmaps" class="tab-btn">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
+        <button id="tab-gmaps" class="tab-btn" role="tab">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
             <circle cx="12" cy="10" r="3"></circle>
           </svg>
-          <span style="margin-left: 4px" data-i18n="tabGmaps">Google Maps</span>
+          <span data-i18n="tabGmaps">Google Maps</span>
         </button>
-      </div>
+      </nav>
 
-      <!-- Main Scraper View -->
+      <!-- ── Main View ───────────────────────────────── -->
       <div id="main-view" class="view active-view">
+
+        <!-- Status Card -->
         <div class="status-card" id="status-card">
-          <div class="status-info">
-            <h2 data-i18n="statusTitle">Current Status</h2>
-            <div id="status-text" class="status-idle" data-i18n="statusIdle">
-              Idle
-            </div>
-            <!-- Activity ticker -->
+          <div class="status-left">
+            <span class="status-label" data-i18n="statusTitle">Current Status</span>
+            <div id="status-text" class="status-value status-idle" data-i18n="statusIdle">Idle</div>
             <div id="activity-log" class="activity-log">Ready to start...</div>
           </div>
-          <div class="counter">
-            <span id="scraped-count">0</span>
-            <span class="count-sep">/</span>
-            <span id="total-found">?</span>
+          <div class="status-right">
+            <div class="counter-block">
+              <span id="scraped-count" class="count-num">0</span>
+              <span class="count-divider">/</span>
+              <span id="total-found" class="count-total">?</span>
+            </div>
+            <span class="counter-label">extracted</span>
           </div>
         </div>
 
         <!-- Progress Bar -->
-        <div class="progress-container" id="progress-container">
-          <div
-            class="progress-bar progress-striped active"
-            id="progress-bar"
-          ></div>
+        <div class="progress-wrap" id="progress-container">
+          <div class="progress-track">
+            <div class="progress-fill" id="progress-bar"></div>
+          </div>
         </div>
 
-        <div class="controls" style="margin-top: 16px">
+        <!-- Controls -->
+        <div class="controls">
+
+          <!-- Target input -->
           <div class="input-group">
-            <label for="fetch-limit" data-i18n="targetLabel"
-              >Target Number of Offers</label
-            >
+            <label for="fetch-limit" data-i18n="targetLabel">Target Number of Offers</label>
             <input type="number" id="fetch-limit" value="50" min="1" />
           </div>
 
+          <!-- Initial buttons -->
           <div class="btn-row" id="initial-btns">
-            <button id="start-btn" class="primary-btn">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
+            <button id="start-btn" class="btn btn-primary btn-start">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="5 3 19 12 5 21 5 3"></polygon>
               </svg>
               <span data-i18n="startBtn">Start Scraping</span>
             </button>
-            <button id="count-btn" class="secondary-btn">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
+            <button id="count-btn" class="btn btn-ghost">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="12" y1="20" x2="12" y2="10"></line>
                 <line x1="18" y1="20" x2="18" y2="4"></line>
                 <line x1="6" y1="20" x2="6" y2="16"></line>
               </svg>
               <span data-i18n="countBtn">Count</span>
             </button>
-            <button id="reset-btn" class="danger-btn">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
+            <button id="reset-btn" class="btn btn-danger-ghost">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 6 5 6 21 6"></polyline>
-                <path
-                  d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-                ></path>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
               </svg>
               <span data-i18n="resetBtn">Reset</span>
             </button>
           </div>
 
+          <!-- Ongoing buttons -->
           <div class="btn-row hidden" id="ongoing-btns">
-            <button id="pause-btn" class="warning-btn">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
+            <button id="pause-btn" class="btn btn-warning">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="6" y="4" width="4" height="16"></rect>
                 <rect x="14" y="4" width="4" height="16"></rect>
               </svg>
               <span data-i18n="pauseBtn">Pause</span>
             </button>
-            <button id="resume-btn" class="primary-btn hidden">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
+            <button id="resume-btn" class="btn btn-primary hidden">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="5 3 19 12 5 21 5 3"></polygon>
               </svg>
               <span data-i18n="resumeBtn">Resume</span>
             </button>
-            <button id="stop-btn" class="danger-btn">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
+            <button id="stop-btn" class="btn btn-danger">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
               </svg>
               <span data-i18n="stopBtn">Stop</span>
             </button>
           </div>
 
-          <!-- Portals Grid -->
+          <!-- Portals grid -->
+          <div class="section-label">Open Portal</div>
           <div class="portals-grid" id="navigation-btns">
-            <button
-              id="arbeitsagentur-btn"
-              class="portal-btn"
-              data-i18n="arbBtn"
-            >
-              Arbeitsagentur
+            <button id="arbeitsagentur-btn" class="portal-btn" data-i18n="arbBtn">
+              <svg class="portal-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+              <span>Arbeitsagentur</span>
             </button>
             <button id="ausbildung-btn" class="portal-btn" data-i18n="ausBtn">
-              Ausbildung
+              <svg class="portal-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+              <span>Ausbildung.de</span>
             </button>
             <button id="aubiplus-btn" class="portal-btn" data-i18n="aubiBtn">
-              Aubi-Plus
+              <svg class="portal-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+              <span>Aubi-Plus.de</span>
             </button>
             <button id="azubi-btn" class="portal-btn" data-i18n="azubiBtn">
-              Azubi
+              <svg class="portal-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+              <span>Azubi.de</span>
             </button>
           </div>
 
-          <!-- Collapsible Settings -->
+          <!-- Settings accordion -->
           <details class="settings-section">
-            <summary data-i18n="settingsTitle">Settings</summary>
+            <summary>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.07 4.93a10 10 0 0 1 1.93 3.07M19.07 19.07a10 10 0 0 1-3.07 1.93M4.93 19.07a10 10 0 0 1-1.93-3.07M4.93 4.93a10 10 0 0 1 3.07-1.93"/>
+                <path d="M12 2v2M12 20v2M2 12h2M20 12h2"/>
+              </svg>
+              <span data-i18n="settingsTitle">Settings</span>
+              <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </summary>
             <div class="settings-content">
-              <div class="setting-item">
-                <label>
-                  <input type="checkbox" id="notify-captcha" checked />
+              <div class="setting-row">
+                <div class="setting-info">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                  </svg>
                   <span data-i18n="captchaLabel">Captcha Sound</span>
-                </label>
+                </div>
+                <input type="checkbox" id="notify-captcha" checked />
               </div>
-              <div class="setting-item">
-                <label>
-                  <input type="checkbox" id="notify-finish" checked />
+              <div class="setting-row">
+                <div class="setting-info">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
+                  </svg>
                   <span data-i18n="finishLabel">Finish Sound</span>
-                </label>
+                </div>
+                <input type="checkbox" id="notify-finish" checked />
               </div>
-              <div
-                class="instructions"
-                style="margin-top: 8px; margin-bottom: 0"
-              >
-                <p>
-                  <strong data-i18n="noteTitle">Note:</strong>
-                  <span data-i18n="noteDesc"
-                    >Solve captchas manually if they appear to keep the scraper
-                    running.</span
-                  >
-                </p>
+              <div class="settings-note">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span><strong data-i18n="noteTitle">Note:</strong> <span data-i18n="noteDesc">Solve captchas manually if they appear to keep the scraper running.</span></span>
               </div>
             </div>
           </details>
 
-          <button id="download-btn" disabled class="success-btn">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
+          <!-- Download -->
+          <button id="download-btn" disabled class="btn btn-success btn-download">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
             <span data-i18n="downloadBtn">Download CSV Results</span>
           </button>
+
         </div>
       </div>
 
-      <!-- Google Maps Settings View -->
+      <!-- ── Google Maps View ────────────────────────── -->
       <div id="gmaps-view" class="view">
-        <h2 class="view-title" data-i18n="gmapsTitle">Google Maps Scraper</h2>
+        <div class="gmaps-header">
+          <div class="gmaps-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+              <circle cx="12" cy="10" r="3"></circle>
+            </svg>
+          </div>
+          <div>
+            <h2 class="gmaps-title" data-i18n="gmapsTitle">Google Maps Scraper</h2>
+            <p class="gmaps-subtitle">Search via DasÖrtliche directory</p>
+          </div>
+        </div>
+
         <div class="input-group">
-          <label for="gmaps-keyword" data-i18n="gmapsKwParams">Keyword</label>
+          <label for="gmaps-keyword" data-i18n="gmapsKwParams">Search Keyword</label>
           <input
             type="text"
             id="gmaps-keyword"
-            placeholder="Enter keyword..."
+            placeholder="e.g. SHK, Sanitär, EDV..."
             data-i18n-placeholder="gmapsKwPlaceholder"
-            class="input-field"
           />
         </div>
         <div class="input-group">
-          <label for="gmaps-city" data-i18n="gmapsCityParams">City</label>
+          <label for="gmaps-city" data-i18n="gmapsCityParams">City / Location</label>
           <input
             type="text"
             id="gmaps-city"
-            placeholder="Enter city..."
+            placeholder="e.g. Berlin, München..."
             data-i18n-placeholder="gmapsCityPlaceholder"
-            class="input-field"
           />
         </div>
-        <div class="view-actions">
-          <button id="gmaps-search-btn" class="primary-btn">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
+
+        <div class="gmaps-actions">
+          <button id="gmaps-search-btn" class="btn btn-primary">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="11" cy="11" r="8"></circle>
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
             <span data-i18n="gmapsSearchBtn">Search on Maps</span>
           </button>
         </div>
-      </div>
-    </div>
 
-    <!-- Custom Modal for Alerts -->
+        <div class="gmaps-tip">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span>After searching, click <strong>Start Scraping</strong> in the Job Portals tab.</span>
+        </div>
+      </div>
+
+    </div><!-- /.shell -->
+
+    <!-- ── Confirm Modal ───────────────────────────── -->
     <div class="modal-overlay" id="confirmModal">
-      <div class="custom-modal">
-        <div class="modal-icon">
-          <svg
-            width="28"
-            height="28"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path
-              d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
-            ></path>
+      <div class="modal">
+        <div class="modal-icon-wrap">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
             <line x1="12" y1="9" x2="12" y2="13"></line>
             <line x1="12" y1="17" x2="12.01" y2="17"></line>
           </svg>
         </div>
         <h3 data-i18n="modalTitle">Clear Data</h3>
-        <p data-i18n="modalDesc">
-          Are you sure you want to clear all scraped data? This action cannot be
-          undone.
-        </p>
-        <div class="modal-btns">
-          <button id="modalCancel" class="btn-cancel" data-i18n="modalCancel">
-            Cancel
-          </button>
-          <button
-            id="modalConfirm"
-            class="btn-confirm"
-            data-i18n="modalConfirm"
-          >
-            Clear All
-          </button>
+        <p data-i18n="modalDesc">Are you sure you want to clear all scraped data? This action cannot be undone.</p>
+        <div class="modal-actions">
+          <button id="modalCancel" class="btn btn-ghost" data-i18n="modalCancel">Cancel</button>
+          <button id="modalConfirm" class="btn btn-danger" data-i18n="modalConfirm">Clear All</button>
         </div>
       </div>
     </div>
