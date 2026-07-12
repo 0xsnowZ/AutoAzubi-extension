@@ -347,10 +347,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         const errorMsg = chrome.runtime.lastError.message;
         console.warn("Message error:", errorMsg);
 
-        // If content script is missing, try to inject it
+        // If content script is missing, try to inject it (only if we haven't retried too many times)
         if (
-          errorMsg.includes("Could not establish connection") ||
-          errorMsg.includes("Receiving end does not exist")
+          retryCount < 3 &&
+          (errorMsg.includes("Could not establish connection") ||
+          errorMsg.includes("Receiving end does not exist"))
         ) {
           console.log("Content script missing. Attempting manual injection...");
           try {
@@ -691,6 +692,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         updateProgress();
       }, 420);
       downloadBtn.disabled = false;
+    } else if (request.action === "error") {
+      updateUI("idle");
+      activityLog.classList.add("active");
+      activityLog.innerText = request.message || "Scraping stopped unexpectedly.";
     }
   });
 

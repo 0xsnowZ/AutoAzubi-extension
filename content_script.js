@@ -128,6 +128,18 @@ async function countResults() {
 }
 
 async function startScraping() {
+    try {
+        await _startScraping();
+    } catch (err) {
+        console.error('Scraping error:', err);
+        isScraping = false;
+        isPaused = false;
+        updateStorage();
+        chrome.runtime.sendMessage({ action: 'error', message: String(err) });
+    }
+}
+
+async function _startScraping() {
     // 1. Initial Filtering (only if not already applied)
     if (!filtersApplied) {
         await applyFilter();
@@ -173,7 +185,7 @@ async function startScraping() {
                     scrapedData.push(info);
                     updateStorage();
                     console.log(`Extracted (${scrapedData.length}/${targetLimit}):`, info);
-                    chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length });
+                    chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, currentTitle: info.company });
                 }
 
                 await sleep(300);

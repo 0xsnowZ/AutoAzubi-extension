@@ -265,10 +265,21 @@ async function crawlWebsiteForEmail(websiteUrl) {
 }
 
 async function startScraping() {
+    try {
+        await _startScraping();
+    } catch (err) {
+        console.error('[GMaps] Scraping error:', err);
+        isScraping = false;
+        isPaused = false;
+        chrome.runtime.sendMessage({ action: 'error', message: String(err) });
+    }
+}
+
+async function _startScraping() {
     const { keyword, city } = extractKwAndCity();
 
     if (!keyword || !city) {
-        alert("Could not extract keyword and city automatically. Please ensure you searched using the format 'Keyword in City' via the popup.");
+        chrome.runtime.sendMessage({ action: 'error', message: 'Could not detect keyword and city. Please search using the popup\'s Google Maps tab.' });
         isScraping = false;
         return;
     }
@@ -369,7 +380,7 @@ async function startScraping() {
                         });
                         console.log(`Extracted data (${scrapedData.length}):`, { company, email });
                         chrome.storage.local.set({ scrapedData });
-                        chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length });
+                        chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, currentTitle: company });
                     } else {
                         console.log("No email found for:", company);
                     }
@@ -439,6 +450,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             isScraping = false;
             isPaused = false;
             currentPageUrl = null;
+            chrome.storage.local.set({ scrapedData });
             sendResponse({ status: 'stopped' });
             break;
         case 'reset':
@@ -446,6 +458,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             isPaused = false;
             scrapedData = [];
             currentPageUrl = null;
+            chrome.storage.local.set({ scrapedData: [] });
             sendResponse({ status: 'reset' });
             break;
         case 'getData':

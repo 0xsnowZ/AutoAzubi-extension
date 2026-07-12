@@ -324,6 +324,7 @@ async function handleSearchPage(limit = 50) {
         chrome.runtime.sendMessage({
           action: "progress",
           count: currentData.length,
+          currentTitle: company,
         });
         console.log(`[Azubi] Extracted (${currentData.length}/${limit}):`, {
           company,
@@ -354,6 +355,19 @@ async function handleSearchPage(limit = 50) {
   isScraping = false;
   isPaused = false;
 }
+
+// Wrap with error propagation
+const _handleSearchPage = handleSearchPage;
+handleSearchPage = async function(limit) {
+  try {
+    await _handleSearchPage(limit);
+  } catch (err) {
+    console.error('[Azubi] Scraping error:', err);
+    isScraping = false;
+    isPaused = false;
+    chrome.runtime.sendMessage({ action: 'error', message: String(err) });
+  }
+};
 
 // Count available results on the current page
 async function countResults() {

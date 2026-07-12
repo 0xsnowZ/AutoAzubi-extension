@@ -195,7 +195,7 @@ async function handleSearchPage(limit = 50) {
                     });
 
                     await new Promise(r => chrome.storage.local.set({ scrapedData: currentData }, r));
-                    chrome.runtime.sendMessage({ action: 'progress', count: currentData.length });
+                    chrome.runtime.sendMessage({ action: 'progress', count: currentData.length, currentTitle: companyName });
                 }
 
             } catch (err) {
@@ -215,6 +215,19 @@ async function handleSearchPage(limit = 50) {
     isScraping = false;
     isPaused = false;
 }
+
+// Wrap with error propagation
+const _handleSearchPage = handleSearchPage;
+handleSearchPage = async function(limit) {
+    try {
+        await _handleSearchPage(limit);
+    } catch (err) {
+        console.error('[AubiPlus] Scraping error:', err);
+        isScraping = false;
+        isPaused = false;
+        chrome.runtime.sendMessage({ action: 'error', message: String(err) });
+    }
+};
 
 async function countResults() {
     await applyFilters();
