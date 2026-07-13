@@ -8,6 +8,7 @@ let isPaused = false;
 let scrapedData = [];
 let targetLimit = 0;
 let filtersApplied = false;
+let currentCardIndex = 0;
 
 // Audio setup
 const captchaSound = new Audio(chrome.runtime.getURL('captcha.mp3'));
@@ -20,12 +21,13 @@ let settings = {
 };
 
 // Initialize State from Storage
-chrome.storage.local.get(['scrapedData', 'isScraping', 'isPaused', 'targetLimit', 'filtersApplied', 'notifyCaptcha', 'notifyFinish'], (result) => {
+chrome.storage.local.get(['scrapedData', 'isScraping', 'isPaused', 'targetLimit', 'filtersApplied', 'currentCardIndex', 'notifyCaptcha', 'notifyFinish'], (result) => {
     if (result.scrapedData) scrapedData = result.scrapedData;
     if (result.isScraping !== undefined) isScraping = result.isScraping;
     if (result.isPaused !== undefined) isPaused = result.isPaused;
     if (result.targetLimit) targetLimit = result.targetLimit;
     if (result.filtersApplied !== undefined) filtersApplied = result.filtersApplied;
+    if (result.currentCardIndex !== undefined) currentCardIndex = result.currentCardIndex;
 
     settings.notifyCaptcha = result.notifyCaptcha !== false;
     settings.notifyFinish = result.notifyFinish !== false;
@@ -44,7 +46,8 @@ function updateStorage() {
         isScraping,
         isPaused,
         targetLimit,
-        filtersApplied
+        filtersApplied,
+        currentCardIndex
     });
 }
 
@@ -62,6 +65,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             if (request.reset) {
                 scrapedData = [];
                 filtersApplied = false;
+                currentCardIndex = 0;
             }
             targetLimit = request.limit || 50;
             updateStorage();
@@ -90,6 +94,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             isPaused = false;
             scrapedData = [];
             filtersApplied = false;
+            currentCardIndex = 0;
             updateStorage();
             sendResponse({ status: 'reset' });
             break;
@@ -147,7 +152,7 @@ async function _startScraping() {
         updateStorage();
     }
 
-    // 2. Select List View
+    // 2. Select List View (if tab exists — removed in newer site versions)
     const viewTab = document.getElementById('ansicht-auswahl-tabbar-item-1');
     if (viewTab) {
         console.log("Switching to list view...");
@@ -164,17 +169,34 @@ async function _startScraping() {
         let cards = document.querySelectorAll('[id^="ergebnisliste-item-"]');
 
         if (scrapedData.length < targetLimit) {
-            for (let i = scrapedData.length; i < cards.length; i++) {
+            for (let i = currentCardIndex; i < cards.length; i++) {
                 if (!isScraping || isPaused) break;
                 if (scrapedData.length >= targetLimit) break;
 
                 const card = cards[i];
                 card.click();
 
-                await sleep(800);
+                await sleep(1000);
 
+                // Click "Info zur Bewerbung" to request contact details
+                const bewerbungBtn = document.getElementById('detailansicht-zur-bewerbung');
+                if (bewerbungBtn) {
+                    console.log("Clicking 'Info zur Bewerbung'...");
+                    bewerbungBtn.click();
+                    await sleep(800);
+                }
+
+                // Handle captcha (appears after requesting contact info)
                 if (await handleCaptcha()) {
-                    // logic inside handlCaptcha waits for solve
+                    // captcha was solved, wait for contact details to load
+                    await sleep(1000);
+                }
+
+                // Wait for contact details to appear (up to 5 seconds)
+                let waitAttempts = 0;
+                while (!document.getElementById('detail-bewerbung-mail') && !document.getElementById('detail-bewerbung-adresse') && waitAttempts < 10) {
+                    await sleep(500);
+                    waitAttempts++;
                 }
 
                 const info = extractInfo();
@@ -186,9 +208,13 @@ async function _startScraping() {
                     updateStorage();
                     console.log(`Extracted (${scrapedData.length}/${targetLimit}):`, info);
                     chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, currentTitle: info.company });
+                } else {
+                    console.log(`Card ${i}: No email found, skipping.`);
                 }
 
                 await sleep(300);
+                currentCardIndex = i + 1;
+                updateStorage();
             }
         }
 
@@ -244,16 +270,17 @@ async function applyFilter() {
 }
 
 async function handleCaptcha() {
-    let captchaForm = document.getElementById('captchaForm') || document.querySelector('form[id*="captcha"]');
+    let captchaForm = document.getElementById('captchaForm') || document.querySelector('form[id*="captcha"]') || document.getElementById('kontaktdaten-captcha-input') || document.querySelector('[id*="kontaktdaten-captcha"]');
     if (captchaForm) {
         console.log("Captcha detected!");
+        chrome.runtime.sendMessage({ action: 'progress', status: 'waiting_captcha' });
 
         // Setup repeating sound every 4 seconds
         let soundInterval = null;
         if (settings.notifyCaptcha) {
             captchaSound.play();
             soundInterval = setInterval(() => {
-                const stillExists = document.getElementById('captchaForm') || document.querySelector('form[id*="captcha"]');
+                const stillExists = document.getElementById('captchaForm') || document.querySelector('form[id*="captcha"]') || document.getElementById('kontaktdaten-captcha-input') || document.querySelector('[id*="kontaktdaten-captcha"]');
                 if (stillExists && isScraping) {
                     captchaSound.play();
                 } else {
@@ -378,7 +405,7 @@ async function handleCaptcha() {
         `;
         document.body.appendChild(notice);
 
-        while (isScraping && (document.getElementById('captchaForm') || document.querySelector('form[id*="captcha"]'))) {
+        while (isScraping && (document.getElementById('captchaForm') || document.querySelector('form[id*="captcha"]') || document.getElementById('kontaktdaten-captcha-input') || document.querySelector('[id*="kontaktdaten-captcha"]'))) {
             await sleep(1000);
         }
 
