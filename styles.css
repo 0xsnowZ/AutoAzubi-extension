@@ -69,26 +69,20 @@ body[dir="rtl"] {
   gap: 11px;
 }
 
-/* Brand icon — use SVG, not raw PNG which may clash in color */
 .brand-icon {
   width: 36px;
   height: 36px;
-  border-radius: var(--radius);
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  overflow: hidden;
 }
 
 .brand-icon img {
-  width: 22px;
-  height: 22px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   display: block;
-  /* tint the PNG to white so it matches the indigo background */
-  filter: brightness(0) invert(1);
 }
 
 .brand-text h1 {
