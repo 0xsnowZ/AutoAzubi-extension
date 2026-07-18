@@ -4,7 +4,8 @@ let isScraping = false;
 let isPaused = false;
 let scrapedData = [];
 let targetLimit = 50;
-let currentPageUrl = null; // tracks pagination position for pause/resume
+let currentPageUrl = null;
+let processedHits = 0; // tracks pagination position for pause/resume
 
 // Helper function to wait
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -237,14 +238,50 @@ async function crawlWebsiteForEmail(websiteUrl) {
         // Normalize URL
         let baseUrl = websiteUrl.replace(/\/+$/, '');
 
-        // Try the 3 most common German contact page paths (covers ~95% of cases)
-        // No sleep between attempts — network round-trip is already a natural delay
-        const contactPaths = ['/impressum', '/kontakt', '/imprint'];
+        // Step 1: Always check the homepage first (email often in footer)
+        const homeResp = await chrome.runtime.sendMessage({ action: 'fetch_text_utf8', url: baseUrl + '/' });
+        let contactPaths = ['/impressum', '/kontakt', '/imprint'];
 
+        if (homeResp && homeResp.success && homeResp.text) {
+            const homeEmail = extractEmail(homeResp.text);
+            if (homeEmail) {
+                console.log(`Found email on homepage: ${homeEmail}`);
+                return homeEmail;
+            }
+
+            // Step 2: If no email, dynamically find the exact Impressum/Kontakt link from the homepage HTML
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(homeResp.text, 'text/html');
+            const links = Array.from(doc.querySelectorAll('a'));
+            
+            const dynamicContactLink = links.find(a => {
+                const text = a.textContent.toLowerCase();
+                const href = a.getAttribute('href') || '';
+                return text.includes('impressum') || text.includes('kontakt') || href.includes('impressum') || href.includes('kontakt');
+            });
+
+            if (dynamicContactLink) {
+                let dynamicHref = dynamicContactLink.getAttribute('href');
+                if (dynamicHref && !dynamicHref.startsWith('http') && !dynamicHref.startsWith('#') && !dynamicHref.startsWith('mailto:')) {
+                    dynamicHref = dynamicHref.startsWith('/') ? dynamicHref : '/' + dynamicHref;
+                    // Prioritize the dynamically found path
+                    contactPaths.unshift(dynamicHref);
+                } else if (dynamicHref && dynamicHref.startsWith('http')) {
+                    // It's an absolute URL (e.g. on a subdomain)
+                    contactPaths.unshift(dynamicHref);
+                }
+            }
+        }
+
+        // De-duplicate contact paths to prevent unnecessary fetches
+        contactPaths = [...new Set(contactPaths)];
+
+        // Step 3: Try the paths
         for (const path of contactPaths) {
             if (!isScraping) break;
 
-            const contactUrl = baseUrl + path;
+            // Handle absolute URLs dynamically found vs relative paths
+            const contactUrl = path.startsWith('http') ? path : baseUrl + path;
             console.log(`Trying contact page: ${contactUrl}`);
 
             const resp = await chrome.runtime.sendMessage({ action: 'fetch_text_utf8', url: contactUrl });
@@ -277,7 +314,16 @@ async function startScraping() {
 }
 
 async function _startScraping() {
-    const { keyword, city } = extractKwAndCity();
+    let { keyword, city } = extractKwAndCity();
+
+    // Prioritize the exact keywords typed by the user in the extension popup.
+    // Google Maps aggressively translates "IT in Berlin" to "Information Technology in Berlin",
+    // which breaks DasÖrtliche's search engine.
+    const stored = await chrome.storage.local.get(['lastGmapsKw', 'lastGmapsCity']);
+    if (stored.lastGmapsKw && stored.lastGmapsCity) {
+        keyword = stored.lastGmapsKw;
+        city = stored.lastGmapsCity;
+    }
 
     if (!keyword || !city) {
         chrome.runtime.sendMessage({ action: 'error', message: 'Could not detect keyword and city. Please search using the popup\'s Google Maps tab.' });
@@ -287,127 +333,63 @@ async function _startScraping() {
 
     console.log(`Starting background scrape for: Keyword=${keyword}, City=${city}`);
 
-    // On first start (or after reset), begin from page 1
-    // On resume, currentPageUrl is already set to where we left off
     if (!currentPageUrl) {
         currentPageUrl = `https://www.dasoertliche.de/?kw=${encodeURIComponent(keyword)}&ci=${encodeURIComponent(city)}&form_name=search_nat`;
     }
 
     while (currentPageUrl && isScraping && scrapedData.length < targetLimit) {
-        // Pause: wait in-place instead of breaking out of the loop
         while (isPaused) {
             await sleep(300);
             if (!isScraping) break;
         }
         if (!isScraping) break;
 
-        console.log("Fetching list page: " + currentPageUrl);
+        console.log(`[DasÖrtliche] Fetching list page: ` + currentPageUrl);
 
         const response = await chrome.runtime.sendMessage({ action: 'fetch_text', url: currentPageUrl });
         if (!response || !response.success) {
-            console.error("Failed to fetch list page", response ? response.error : 'No response');
+            console.error(`[DasÖrtliche] Failed to fetch list page`, response ? response.error : 'No response');
             break;
         }
 
         const parser = new DOMParser();
         const doc = parser.parseFromString(response.text, 'text/html');
 
-        // Handle Ortsauswahl (City Selection)
         const ortsLink = doc.querySelector('a[href*="zvo_ok=1"]');
         if (ortsLink && !doc.querySelector('.hit')) {
             let redirectUrl = ortsLink.getAttribute('href').replace(/&amp;/g, '&');
             if (!redirectUrl.startsWith('http')) {
                 redirectUrl = 'https://www.dasoertliche.de' + (redirectUrl.startsWith('/') ? '' : '/') + redirectUrl;
             }
-            console.log("Ortsauswahl detected. Redirecting to first option: " + redirectUrl);
             currentPageUrl = redirectUrl;
-            continue; // Proceed directly to the valid target page
+            continue;
         }
 
-        const hits = doc.querySelectorAll('.hit');
-        if (!hits || hits.length === 0) {
-            console.log("No hits found on this page.");
-            // check if there's any other indicator
-        }
-
-        for (const hit of hits) {
+        const hitsArray = Array.from(doc.querySelectorAll('.hit'));
+        for (let i = 0; i < hitsArray.length; i += 4) {
             if (!isScraping || isPaused) break;
             if (scrapedData.length >= targetLimit) break;
 
-            const nameLink = hit.querySelector('.hitlnk_name');
-            if (!nameLink) continue;
+            const chunk = hitsArray.slice(i, i + 4);
+            await Promise.all(chunk.map(processHit));
+            
+            // Save data once per chunk instead of 4 times concurrently
+            chrome.storage.local.set({ scrapedData });
+        }
 
-            const company = nameLink.textContent.trim();
-            const href = nameLink.getAttribute('href');
+            if (!isScraping || scrapedData.length >= targetLimit) break;
 
-            const addressElem = hit.querySelector('address');
-            const address = addressElem ? addressElem.textContent.trim().replace(/\s+/g, ' ') : '';
-
-            const phoneElem = hit.querySelector('.phoneblock');
-            const phone = phoneElem ? phoneElem.textContent.trim().replace(/\s+/g, ' ') : '';
-
-            if (href) {
-                let detailUrl = href;
-                if (!detailUrl.startsWith('http')) {
-                    detailUrl = 'https://www.dasoertliche.de' + (detailUrl.startsWith('/') ? '' : '/') + detailUrl;
+            const nextPageLink = doc.querySelector('.paging a[title*="chsten"]') || Array.from(doc.querySelectorAll('.paging a')).find(a => a.textContent.trim() === '›');
+            if (nextPageLink) {
+                let nextHref = nextPageLink.getAttribute('href').replace(/&amp;/g, '&');
+                if (!nextHref.startsWith('http')) {
+                    nextHref = 'https://www.dasoertliche.de' + (nextHref.startsWith('/') ? '' : '/') + nextHref;
                 }
-
-                await sleep(100); // Small delay between detail fetches
-
-                console.log(`Fetching detail page: ${detailUrl}`);
-                const detailResp = await chrome.runtime.sendMessage({ action: 'fetch_text', url: detailUrl });
-                if (detailResp && detailResp.success) {
-                    const rawHtml = detailResp.text;
-
-                    // Extract email from DasÖrtliche detail page using multiple strategies
-                    let email = extractEmail(rawHtml);
-
-                    // If no email found on DasÖrtliche, try crawling the company's website
-                    if (!email) {
-                        const websiteUrl = extractWebsiteUrl(rawHtml);
-                        if (websiteUrl) {
-                            console.log(`No email on DasÖrtliche. Crawling website: ${websiteUrl}`);
-                            await sleep(100);
-                            email = await crawlWebsiteForEmail(websiteUrl);
-                        }
-                    }
-
-                    if (email) {
-                        scrapedData.push({
-                            company,
-                            address,
-                            phone,
-                            email
-                        });
-                        console.log(`Extracted data (${scrapedData.length}):`, { company, email });
-                        chrome.storage.local.set({ scrapedData });
-                        chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, currentTitle: company });
-                    } else {
-                        console.log("No email found for:", company);
-                    }
-                }
+                currentPageUrl = nextHref;
+            } else {
+                currentPageUrl = null;
             }
-        }
-
-        if (!isScraping || scrapedData.length >= targetLimit) {
-            break;
-        }
-
-        // Find next page
-        const nextPageLink = doc.querySelector('.paging a[title*="chsten"]') || Array.from(doc.querySelectorAll('.paging a')).find(a => a.textContent.trim() === '›');
-        if (nextPageLink) {
-            let nextHref = nextPageLink.getAttribute('href').replace(/&amp;/g, '&');
-            if (!nextHref.startsWith('http')) {
-                nextHref = 'https://www.dasoertliche.de' + (nextHref.startsWith('/') ? '' : '/') + nextHref;
-            }
-            currentPageUrl = nextHref;
-            console.log("Found next page:", currentPageUrl);
-        } else {
-            console.log("No next page link found. Finished.");
-            currentPageUrl = null;
-        }
-
-        await sleep(200); // Delay between pages
+        await sleep(200);
     }
 
     if (isScraping && !isPaused && (scrapedData.length >= targetLimit || !currentPageUrl)) {
@@ -417,6 +399,64 @@ async function _startScraping() {
         isPaused = false;
         chrome.storage.local.set({ isScraping: false, isPaused: false });
         chrome.runtime.sendMessage({ action: 'finished', count: scrapedData.length });
+    }
+}
+
+/**
+ * Modular function to process a single company hit from the search list
+ */
+async function processHit(hit) {
+    if (!isScraping || isPaused) return;
+    if (scrapedData.length >= targetLimit) return;
+
+    try {
+        const nameLink = hit.querySelector('.hitlnk_name');
+        if (!nameLink) return;
+
+        const company = nameLink.textContent.trim();
+        const href = nameLink.getAttribute('href');
+
+        const addressElem = hit.querySelector('address');
+        const address = addressElem ? addressElem.textContent.trim().replace(/\s+/g, ' ') : '';
+
+        const phoneElem = hit.querySelector('.phoneblock');
+        const phone = phoneElem ? phoneElem.textContent.trim().replace(/\s+/g, ' ') : '';
+
+        if (href) {
+            let detailUrl = href;
+            if (!detailUrl.startsWith('http')) {
+                detailUrl = 'https://www.dasoertliche.de' + (detailUrl.startsWith('/') ? '' : '/') + detailUrl;
+            }
+
+            processedHits++;
+            chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, currentTitle: `[DÖ] Checked ${processedHits} hits... Scanning ${company}` });
+            await sleep(Math.random() * 200 + 50); // Jitter to prevent burst rate limits
+            
+            const detailResp = await chrome.runtime.sendMessage({ action: 'fetch_text', url: detailUrl });
+            if (detailResp && detailResp.success) {
+                const rawHtml = detailResp.text;
+                let email = extractEmail(rawHtml);
+                
+                if (!email) {
+                    const websiteUrl = extractWebsiteUrl(rawHtml);
+                    if (websiteUrl) {
+                        email = await crawlWebsiteForEmail(websiteUrl);
+                    }
+                }
+
+                if (email) {
+                    // Strict Data Deduplication: Check if email already exists in our dataset
+                    const isDuplicate = scrapedData.some(item => item.email.toLowerCase() === email.toLowerCase());
+                    
+                    if (!isDuplicate && scrapedData.length < targetLimit) {
+                        scrapedData.push({ company, address, phone, email });
+                        chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, currentTitle: `[DÖ] Found email for: ${company}` });
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Error processing company hit:", e);
     }
 }
 
@@ -434,6 +474,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             currentPageUrl = null; // always restart from page 1 on fresh start
             if (request.reset) {
                 scrapedData = [];
+                processedHits = 0;
             }
             targetLimit = request.limit || 50;
             startScraping();

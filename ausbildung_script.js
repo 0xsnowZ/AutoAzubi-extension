@@ -1,41 +1,49 @@
-// ausbildung_script.js - Scraper for ausbildung.de
+// ausbildung_script.js - Scraper for ausbildung.de (Next.js SPA)
+// PAGINATION STRATEGY: Full-page reload with persistent session state.
+// Next.js client-side navigation cannot be reliably triggered from a content script.
+// We save all state to chrome.storage.local, navigate via window.location.href,
+// and auto-resume when this script re-runs on the new page.
+
 let isScraping = false;
 let isPaused = false;
-let targetLimit = 50;
 
 const finishedSound = new Audio(chrome.runtime.getURL("finished.mp3"));
 let settings = { notifyFinish: true };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Extract email from raw HTML — avoids DOMParser mailto: resolution issues
-function extractEmailFromHtml(html) {
-  const mailtoMatch = html.match(/href=["']mailto:([^"'?\s]+)/i);
-  if (mailtoMatch) return mailtoMatch[1].trim();
+// ─── Data Extraction Helpers ─────────────────────────────────────────────────
 
+function extractEmailFromHtml(html) {
+  // Priority 1: explicit mailto link
+  const mailtoMatch = html.match(/href=["']mailto:([^"'?\s]+)/i);
+  if (mailtoMatch) return mailtoMatch[1].trim().toLowerCase();
+
+  // Priority 2: bare email pattern in text (not inside script/style blocks)
   const emailMatch = html.match(
     /\b([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,6})\b/,
   );
-  if (emailMatch) return emailMatch[1].trim();
+  if (emailMatch) return emailMatch[1].trim().toLowerCase();
 
   return "";
 }
 
-// Extract company name — JSON-LD first, then DOM selectors
 function extractCompanyFromDoc(doc) {
+  // Best source: structured JSON-LD schema data (most reliable)
   const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
   for (const script of scripts) {
     try {
       const data = JSON.parse(script.textContent);
       const items = Array.isArray(data) ? data : [data];
       for (const item of items) {
-        if (item.hiringOrganization && item.hiringOrganization.name) {
+        if (item.hiringOrganization?.name) {
           return item.hiringOrganization.name.trim();
         }
       }
-    } catch (e) {}
+    } catch (e) {} // Malformed JSON, skip gracefully
   }
 
+  // Fallback: DOM selectors
   const selectors = [
     ".jp-c-header__corporation-link",
     '[class*="corporation-link"]',
@@ -52,8 +60,8 @@ function extractCompanyFromDoc(doc) {
   return "";
 }
 
-// Extract address — JSON-LD first, then specific selectors
 function extractAddressFromDoc(doc) {
+  // Best source: structured JSON-LD schema data
   const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
   for (const script of scripts) {
     try {
@@ -64,16 +72,14 @@ function extractAddressFromDoc(doc) {
           const loc = Array.isArray(item.jobLocation)
             ? item.jobLocation[0]
             : item.jobLocation;
-          if (loc && loc.address) {
+          if (loc?.address) {
             const addr = loc.address;
             if (typeof addr === "string" && addr.trim()) return addr.trim();
             const street = addr.streetAddress || "";
             const postal = addr.postalCode || "";
             const city = addr.addressLocality || "";
             if (street) {
-              const extra = [postal, city].filter(
-                (p) => p && !street.includes(p),
-              );
+              const extra = [postal, city].filter((p) => p && !street.includes(p));
               return extra.length ? `${street}, ${extra.join(", ")}` : street;
             }
             const parts = [postal, city].filter(Boolean);
@@ -84,6 +90,7 @@ function extractAddressFromDoc(doc) {
     } catch (e) {}
   }
 
+  // Fallback: DOM selectors
   const selectors = [
     ".jp-title__address",
     '[itemprop="addressLocality"]',
@@ -100,18 +107,16 @@ function extractAddressFromDoc(doc) {
   return "";
 }
 
-// Extract all job detail links from a parsed document
 function extractJobLinksFromDoc(doc) {
   const links = new Set();
   doc.querySelectorAll('a[href*="/stellen/"]').forEach((a) => {
-    // getAttribute gives the raw href, avoiding chrome-extension:// resolution
     const href = a.getAttribute("href");
     if (!href) return;
-    // Build absolute URL
     let url = href.startsWith("http")
       ? href
       : "https://www.ausbildung.de" + href;
-    url = url.split("?")[0]; // strip query params
+    url = url.split("?")[0]; // strip tracking query params
+    // Ensure it's a specific job listing, not the directory root
     if (url.includes("/stellen/") && !url.endsWith("/stellen/")) {
       links.add(url);
     }
@@ -119,13 +124,26 @@ function extractJobLinksFromDoc(doc) {
   return Array.from(links);
 }
 
-// Get job links from the live DOM (current page)
-function getJobLinksFromPage() {
-  return extractJobLinksFromDoc(document);
+// ─── Persistent Session Helpers ───────────────────────────────────────────────
+
+const STATE_KEY = "ausbildungScrapingSession";
+
+async function saveSession(session) {
+  return new Promise((r) => chrome.storage.local.set({ [STATE_KEY]: session }, r));
 }
 
-// Build the search URL for a given page number
-// ausbildung.de uses ?page=N in the URL
+async function loadSession() {
+  return new Promise((r) =>
+    chrome.storage.local.get([STATE_KEY], (res) => r(res[STATE_KEY] || null)),
+  );
+}
+
+async function clearSession() {
+  return new Promise((r) => chrome.storage.local.remove(STATE_KEY, r));
+}
+
+// ─── URL Builder ─────────────────────────────────────────────────────────────
+
 function buildPageUrl(baseUrl, page) {
   const url = new URL(baseUrl);
   if (page > 1) {
@@ -136,180 +154,271 @@ function buildPageUrl(baseUrl, page) {
   return url.toString();
 }
 
-// Main scraping loop — fetches pages directly via URL pagination
+// ─── Core Scraping Engine ─────────────────────────────────────────────────────
+
+async function runScraping(session) {
+  // BUG FIX: Destructure immutable values and mutable state correctly.
+  // `currentData` and `page` need to be `let` for mutation.
+  // `processedLinks` is rebuilt from the array each resume to avoid stale Set.
+  const { limit, baseUrl } = session;
+  let { currentData, page, processedHits: savedHits, dryPageCount: savedDryPages } = session;
+  const processedLinks = new Set(session.processedLinks || []);
+  let processedHits = savedHits || 0; // Persist across page reloads
+  let emptyPageCount = 0;      // Pages with zero job links
+  let dryPageCount = savedDryPages || 0;        // Pages with links but zero new emails found
+  const MAX_EMPTY_PAGES = 3;
+  const MAX_DRY_PAGES = 5;     // Stop if 5 consecutive pages yield no emails
+
+  while (isScraping && currentData.length < limit) {
+    // ── Pause loop ──────────────────────────────────────────────────────────
+    while (isPaused) {
+      await sleep(500);
+      if (!isScraping) return; // Stopped while paused
+    }
+    if (!isScraping) return;
+
+    // ── Get job links from LIVE fully-rendered DOM ──────────────────────────
+    const jobLinks = extractJobLinksFromDoc(document).filter(
+      (l) => !processedLinks.has(l),
+    );
+
+    console.log(`[Ausbildung] Page ${page}: ${jobLinks.length} new links found`);
+
+    if (jobLinks.length === 0) {
+      emptyPageCount++;
+      if (emptyPageCount >= MAX_EMPTY_PAGES) {
+        console.log("[Ausbildung] No more results. Scraping complete.");
+        break;
+      }
+      // Navigate to next page
+      await navigateToNextPage(page + 1, baseUrl, currentData, limit, processedLinks, processedHits, dryPageCount);
+      return; // Script resumes after page reload
+    }
+
+    emptyPageCount = 0;
+
+    // Track emails found on THIS specific page to detect dry pages
+    const countBefore = currentData.length;
+    for (const jobUrl of jobLinks) {
+      // BUG FIX: Only return (not break) when paused to ensure the outer
+      // while-loop's pause-check is re-entered properly on resume.
+      // When paused mid-loop, we still want to save state, so don't return immediately.
+      if (!isScraping) return;
+      if (isPaused) {
+        // Save current progress before entering pause wait
+        await saveSession({ limit, baseUrl, currentData, page, processedLinks: [...processedLinks] });
+        while (isPaused) {
+          await sleep(500);
+          if (!isScraping) return;
+        }
+      }
+      if (currentData.length >= limit) break;
+
+      processedLinks.add(jobUrl);
+      processedHits++;
+
+      chrome.runtime.sendMessage({
+        action: "progress",
+        count: currentData.length,
+        currentTitle: `[Ausbildung] Job ${processedHits} · Page ${page}`,
+      });
+
+      try {
+        const response = await fetch(jobUrl, {
+          credentials: "include",
+          headers: { "Accept": "text/html,application/xhtml+xml" },
+        });
+        if (!response.ok) {
+          console.warn(`[Ausbildung] Fetch failed (${response.status}): ${jobUrl}`);
+          continue;
+        }
+
+        const html = await response.text();
+        const email = extractEmailFromHtml(html);
+        if (!email) continue;
+
+        // Strict deduplication by normalized email
+        const isDuplicate = currentData.some(
+          (item) => item.email === email,
+        );
+        if (isDuplicate) {
+          console.log(`[Ausbildung] Skipping duplicate: ${email}`);
+          continue;
+        }
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+        const company = extractCompanyFromDoc(doc);
+        const address = extractAddressFromDoc(doc);
+
+        currentData.push({ company, email, address, contact: "", anrede: "", link: jobUrl, phone: "" });
+
+        // Persist to storage immediately so no data is lost on crash/stop
+        await new Promise((r) => chrome.storage.local.set({ scrapedData: currentData }, r));
+        chrome.runtime.sendMessage({
+          action: "progress",
+          count: currentData.length,
+          currentTitle: `[Ausbildung] ✓ ${company}`,
+        });
+        console.log(`[Ausbildung] ✓ (${currentData.length}/${limit}): ${company} <${email}>`);
+
+      } catch (err) {
+        console.error(`[Ausbildung] Error processing ${jobUrl}:`, err);
+      }
+
+      // Anti-bot jitter: 400–900ms randomized delay
+      await sleep(Math.floor(Math.random() * 500) + 400);
+    }
+
+    if (currentData.length >= limit) break;
+
+    // If this page had zero new emails, increment dry page counter
+    if (currentData.length === countBefore) {
+      dryPageCount++;
+      console.log(`[Ausbildung] Dry page ${dryPageCount}/${MAX_DRY_PAGES} (page ${page} had no emails)`);
+      if (dryPageCount >= MAX_DRY_PAGES) {
+        console.log(`[Ausbildung] Too many dry pages. Finishing with ${currentData.length} results.`);
+        chrome.runtime.sendMessage({
+          action: "progress",
+          count: currentData.length,
+          currentTitle: `[Ausbildung] Done — no more emails found`,
+        });
+        break;
+      }
+    } else {
+      dryPageCount = 0; // Reset when we find new emails
+    }
+
+    // ── All links on this page done, move to next page ──────────────────────
+    await navigateToNextPage(page + 1, baseUrl, currentData, limit, processedLinks, processedHits, dryPageCount);
+    return; // Script resumes after page reload
+  }
+
+  // ── Scraping complete (limit reached or no more pages) ────────────────────
+  await clearSession();
+  chrome.storage.local.set({ isScraping: false, isPaused: false });
+
+  // BUG FIX: Check `isScraping` BEFORE setting it to false, otherwise
+  // the condition is always false when we reach here via a stop() call.
+  const wasRunning = isScraping;
+  isScraping = false;
+  isPaused = false;
+
+  if (wasRunning) {
+    if (settings.notifyFinish) finishedSound.play().catch(() => {});
+    chrome.runtime.sendMessage({ action: "finished", count: currentData.length });
+  }
+}
+
+// Helper: saves session and navigates to the next page
+async function navigateToNextPage(nextPage, baseUrl, currentData, limit, processedLinks, processedHits = 0, dryPageCount = 0) {
+  const nextUrl = buildPageUrl(baseUrl, nextPage);
+  console.log(`[Ausbildung] Navigating to page ${nextPage}: ${nextUrl}`);
+
+  await saveSession({
+    limit,
+    baseUrl,
+    currentData,
+    page: nextPage,
+    processedLinks: [...processedLinks],
+    processedHits,
+    dryPageCount
+  });
+
+  chrome.runtime.sendMessage({
+    action: "progress",
+    count: currentData.length,
+    currentTitle: `[Ausbildung] Loading page ${nextPage}...`,
+  });
+
+  await sleep(600); // Brief pause to let storage flush before navigation
+  window.location.href = nextUrl;
+}
+
+// ─── Entry Point: Fresh Start ─────────────────────────────────────────────────
+
 async function handleSearchPage(limit = 50) {
   if (isScraping) return;
   isScraping = true;
   isPaused = false;
-  targetLimit = limit;
 
-  await sleep(1000);
+  // Wait for any existing page transition to settle
+  await sleep(800);
 
-  let currentData = await new Promise((r) => {
-    chrome.storage.local.get(["scrapedData"], (res) =>
-      r(res.scrapedData || []),
-    );
-  });
+  const currentData = await new Promise((r) =>
+    chrome.storage.local.get(["scrapedData"], (res) => r(res.scrapedData || [])),
+  );
 
-  const processedLinks = new Set();
-
-  // Determine base search URL (strip page param)
+  // Strip page param from URL to get the canonical base search URL
   const baseUrl = (() => {
     const url = new URL(window.location.href);
     url.searchParams.delete("page");
     return url.toString();
   })();
 
-  let page = 1;
-  let emptyPageCount = 0;
-  const MAX_EMPTY_PAGES = 10;
+  // BUG FIX: If user happens to start on page 2+ (e.g., navigated manually),
+  // record the actual current page instead of always assuming page 1.
+  const page = parseInt(new URL(window.location.href).searchParams.get("page") || "1", 10);
 
-  while (isScraping && currentData.length < limit) {
-    // Pause check
-    while (isPaused) {
-      await sleep(500);
-      if (!isScraping) break;
-    }
-    if (!isScraping) break;
+  const session = { limit, baseUrl, currentData, page, processedLinks: [] };
+  await saveSession(session);
 
-    // Fetch the search results page
-    let pageDoc;
-    if (page === 1) {
-      // Use the live DOM for page 1 (already loaded)
-      pageDoc = document;
-    } else {
-      const pageUrl = buildPageUrl(baseUrl, page);
-      console.log(`[Ausbildung] Fetching page ${page}: ${pageUrl}`);
-      try {
-        const res = await fetch(pageUrl, { credentials: "include" });
-        if (!res.ok) {
-          console.warn("[Ausbildung] Page fetch failed:", res.status);
-          break;
-        }
-        const html = await res.text();
-        const parser = new DOMParser();
-        pageDoc = parser.parseFromString(html, "text/html");
-      } catch (err) {
-        console.error("[Ausbildung] Error fetching page:", err);
-        break;
-      }
-    }
-
-    const jobLinks = extractJobLinksFromDoc(pageDoc).filter(
-      (l) => !processedLinks.has(l),
-    );
-    console.log(
-      `[Ausbildung] Page ${page}: found ${jobLinks.length} new job links`,
-    );
-
-    if (jobLinks.length === 0) {
-      emptyPageCount++;
-      if (emptyPageCount >= MAX_EMPTY_PAGES) {
-        console.log(
-          "[Ausbildung] No more results after",
-          MAX_EMPTY_PAGES,
-          "empty pages.",
-        );
-        break;
-      }
-      page++;
-      continue;
-    }
-
-    emptyPageCount = 0;
-
-    for (const jobUrl of jobLinks) {
-      if (!isScraping || isPaused) break;
-      if (currentData.length >= limit) break;
-
-      processedLinks.add(jobUrl);
-
-      try {
-        const response = await fetch(jobUrl, { credentials: "include" });
-        if (!response.ok) {
-          console.warn(
-            "[Ausbildung] Job fetch failed:",
-            jobUrl,
-            response.status,
-          );
-          continue;
-        }
-
-        const html = await response.text();
-        const email = extractEmailFromHtml(html);
-        if (!email) continue; // email is required
-
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, "text/html");
-
-        const company = extractCompanyFromDoc(doc);
-        const address = extractAddressFromDoc(doc);
-
-        currentData.push({
-          company,
-          email,
-          address,
-          contact: "",
-          anrede: "",
-          link: jobUrl,
-          phone: "",
-        });
-
-        await new Promise((r) =>
-          chrome.storage.local.set({ scrapedData: currentData }, r),
-        );
-        chrome.runtime.sendMessage({
-          action: "progress",
-          count: currentData.length,
-          currentTitle: company,
-        });
-        console.log(
-          `[Ausbildung] Extracted (${currentData.length}/${limit}):`,
-          { company, email },
-        );
-      } catch (err) {
-        console.error("[Ausbildung] Error fetching job:", jobUrl, err);
-      }
-
-      await sleep(300);
-    }
-
-    // Move to next page after processing all links on this page
-    if (currentData.length < limit) {
-      page++;
-    }
-  }
-
-  if (isScraping) {
-    if (settings.notifyFinish) finishedSound.play().catch(() => {});
-    chrome.runtime.sendMessage({
-      action: "finished",
-      count: currentData.length,
-    });
-  }
-  isScraping = false;
-  isPaused = false;
-  chrome.storage.local.set({ isScraping: false, isPaused: false });
-}
-
-// Wrap with error propagation
-const _handleSearchPage = handleSearchPage;
-handleSearchPage = async function(limit) {
   try {
-    await _handleSearchPage(limit);
+    await runScraping(session);
   } catch (err) {
-    console.error('[Ausbildung] Scraping error:', err);
+    console.error("[Ausbildung] Fatal error:", err);
     isScraping = false;
     isPaused = false;
+    await clearSession();
     chrome.storage.local.set({ isScraping: false, isPaused: false });
-    chrome.runtime.sendMessage({ action: 'error', message: String(err) });
+    chrome.runtime.sendMessage({ action: "error", message: String(err) });
   }
-};
+}
 
-// Count available results
+// ─── Auto-Resume on Page Load ─────────────────────────────────────────────────
+// This IIFE runs immediately when the content script is injected (on every page load).
+// If a session exists in storage, it means we navigated here mid-scrape and must resume.
+(async () => {
+  // BUG FIX: Give Next.js enough time to fully hydrate the page and render
+  // job card components. 1500ms was too short for slow connections; 2000ms is safer.
+  await sleep(2000);
+
+  const session = await loadSession();
+  if (!session) return; // No active session, user hasn't started scraping
+
+  // BUG FIX: Guard against resuming on the WRONG page.
+  // If the current URL's page number doesn't match the session's expected page,
+  // a redirect happened. Update the session page to match reality.
+  const actualPage = parseInt(new URL(window.location.href).searchParams.get("page") || "1", 10);
+  if (session.page !== actualPage) {
+    console.warn(`[Ausbildung] Page mismatch: expected ${session.page}, got ${actualPage}. Correcting.`);
+    session.page = actualPage;
+  }
+
+  console.log(`[Ausbildung] Auto-resuming session on page ${session.page}...`);
+  isScraping = true;
+  isPaused = false;
+
+  chrome.runtime.sendMessage({
+    action: "progress",
+    count: session.currentData.length,
+    currentTitle: `[Ausbildung] Resumed on page ${session.page}`,
+  });
+
+  try {
+    await runScraping(session);
+  } catch (err) {
+    console.error("[Ausbildung] Resume error:", err);
+    isScraping = false;
+    isPaused = false;
+    await clearSession();
+    chrome.storage.local.set({ isScraping: false, isPaused: false });
+  }
+})();
+
+// ─── Count Available Results ──────────────────────────────────────────────────
 async function countResults() {
   await sleep(800);
-
   const headlineSelectors = [
     '[class*="headline"]',
     '[class*="result-count"]',
@@ -319,27 +428,21 @@ async function countResults() {
     "h1",
     "h2",
   ];
-
   for (const sel of headlineSelectors) {
     const el = document.querySelector(sel);
     if (!el) continue;
     const text = el.innerText || el.textContent || "";
-    const match = text.match(
-      /([\d.,]+)\s*(freie|Ausbildung|Stellen|Ergebnisse|results)/i,
-    );
+    const match = text.match(/([\d.,]+)\s*(freie|Ausbildung|Stellen|Ergebnisse|results)/i);
     if (match) return parseInt(match[1].replace(/[.,]/g, ""), 10);
     const numMatch = text.match(/^([\d.,]+)/);
     if (numMatch) return parseInt(numMatch[1].replace(/[.,]/g, ""), 10);
   }
-
-  return getJobLinksFromPage().length;
+  return extractJobLinksFromDoc(document).length;
 }
 
-// Listen for popup actions
+// ─── Message Listener ─────────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.settings) {
-    settings = request.settings;
-  }
+  if (request.settings) settings = request.settings;
 
   if (request.action === "countResults") {
     countResults().then((total) => sendResponse({ total }));
@@ -348,16 +451,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "reset") {
     isScraping = false;
     isPaused = false;
-    chrome.storage.local.set({ scrapedData: [] }, () => {
-      sendResponse({ status: "reset" });
-    });
+    clearSession();
+    chrome.storage.local.set({ scrapedData: [] }, () => sendResponse({ status: "reset" }));
     return true;
   }
   if (request.action === "start") {
     const limit = request.limit || 50;
-    if (!isScraping) {
-      handleSearchPage(limit);
-    }
+    if (!isScraping) handleSearchPage(limit);
     sendResponse({ status: "started" });
     return true;
   }
@@ -374,12 +474,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "stop") {
     isScraping = false;
     isPaused = false;
+    clearSession();
     sendResponse({ status: "stopped" });
     return true;
   }
   if (request.action === "getInitialInfo") {
     chrome.storage.local.get(["scrapedData"], (res) => {
-      const scount = res.scrapedData ? res.scrapedData.length : 0;
+      const scount = res.scrapedData?.length || 0;
       sendResponse({ isScraping, isPaused, scrapedCount: scount });
     });
     return true;

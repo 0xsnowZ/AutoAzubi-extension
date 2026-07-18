@@ -82,20 +82,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Detect which portal (if any) the active tab belongs to and highlight it
   function detectActivePortal(url) {
     const map = [
-      { id: "arbeitsagentur-btn", test: (u) => u.includes("arbeitsagentur.de") },
-      { id: "ausbildung-btn",     test: (u) => u.includes("ausbildung.de") },
-      { id: "aubiplus-btn",       test: (u) => u.includes("aubi-plus.de") },
-      { id: "azubi-btn",          test: (u) => u.includes("azubi.de") },
+      { id: "arbeitsagentur-btn", label: "Arbeitsagentur", test: (u) => u.includes("arbeitsagentur.de") },
+      { id: "ausbildung-btn",     label: "Ausbildung.de", test: (u) => u.includes("ausbildung.de") },
+      { id: "aubiplus-btn",       label: "Aubi-Plus.de", test: (u) => u.includes("aubi-plus.de") },
+      { id: "azubi-btn",          label: "Azubi.de", test: (u) => u.includes("azubi.de") },
+      { id: "gmaps-btn",          label: "Google Maps", test: (u) => u.includes("google.com/maps") || u.includes("google.de/maps") || u.includes("dasoertliche.de") },
     ];
     let matched = null;
-    map.forEach(({ id, test }) => {
+    map.forEach(({ id, label, test }) => {
       const btn = document.getElementById(id);
-      if (!btn) return;
       if (url && test(url)) {
-        btn.classList.add("portal-active");
-        matched = btn.querySelector("span")?.innerText || id;
+        if (btn) btn.classList.add("portal-active");
+        matched = label;
       } else {
-        btn.classList.remove("portal-active");
+        if (btn) btn.classList.remove("portal-active");
       }
     });
     if (activeSiteBadge) {
@@ -130,9 +130,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       statusFinished: "Finished",
       statusRunning: "Running",
       statusPaused: "Paused",
-      targetLabel: "Target Number of Offers",
-      countBtn: "Count",
-      startBtn: "Start Scraping",
+      targetLabel: "Extraction Limit",
+      countBtn: "Calculate Total",
+      startBtn: "Start Extraction",
       resetBtn: "Reset",
       arbBtn: "Open Arbeitsagentur",
       ausBtn: "Open Ausbildung.de",
@@ -149,23 +149,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       finishLabel: "Finish Sound",
       noteTitle: "Note:",
       noteDesc:
-        "Solve captchas manually if they appear to keep the scraper running.",
-      downloadBtn: "Download CSV Results",
+        "Please resolve any Captcha challenges manually to resume data extraction.",
+      downloadBtn: "Export Data",
       applyingFilters: "Applying filters...",
       refreshPage: "Please refresh the page",
       waitingCaptcha: "Waiting for Captcha",
-      gmapsTitle: "Google Maps Scraper",
-      gmapsKwParams: "Search Keyword",
-      gmapsCityParams: "City / Location",
-      gmapsSearchBtn: "Search on Maps",
+      gmapsTitle: "Google Maps Extractor",
+      gmapsKwParams: "Target Industry",
+      gmapsCityParams: "Target City",
+      gmapsSearchBtn: "Search on Google Maps",
       gmapsBackBtn: "Back",
       modalTitle: "Clear Data",
       modalDesc:
         "Are you sure you want to clear all scraped data? This action cannot be undone.",
       modalCancel: "Cancel",
       modalConfirm: "Clear All",
-      gmapsKwPlaceholder: "Enter keyword...",
-      gmapsCityPlaceholder: "Enter city...",
+      gmapsKwPlaceholder: "Select or type industry...",
+      gmapsCityPlaceholder: "Select or type city...",
     },
     ar: {
       titleText: "AutoAzubi Extractor",
@@ -175,8 +175,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       statusFinished: "مكتمل",
       statusRunning: "قيد التشغيل",
       statusPaused: "متوقف مؤقتاً",
-      targetLabel: "العدد المستهدف للعروض",
-      countBtn: "حساب",
+      targetLabel: "الحد الأقصى للاستخراج",
+      countBtn: "حساب الإجمالي",
       startBtn: "بدء الاستخراج",
       resetBtn: "إعادة ضبط",
       arbBtn: "افتح Arbeitsagentur",
@@ -193,22 +193,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       captchaLabel: "صوت الكابتشا",
       finishLabel: "صوت الانتهاء",
       noteTitle: "ملاحظة:",
-      noteDesc: "قم بحل الكابتشا يدويًا إذا ظهرت لإبقاء المستخرج قيد التشغيل.",
-      downloadBtn: "تحميل نتائج CSV",
+      noteDesc: "يرجى حل أي تحديات كابتشا يدويًا لاستئناف استخراج البيانات.",
+      downloadBtn: "تصدير البيانات",
       applyingFilters: "جارِ تطبيق الفلاتر...",
       refreshPage: "يرجى تحديث الصفحة",
       waitingCaptcha: "في انتظار الكابتشا",
       gmapsTitle: "مستخرج خرائط جوجل",
-      gmapsKwParams: "الكلمة المفتاحية",
-      gmapsCityParams: "المدينة / الموقع",
-      gmapsSearchBtn: "البحث في الخرائط",
+      gmapsKwParams: "المجال المستهدف",
+      gmapsCityParams: "المدينة المستهدفة",
+      gmapsSearchBtn: "البحث في خرائط جوجل",
       gmapsBackBtn: "رجوع",
       modalTitle: "مسح البيانات",
       modalDesc: "هل أنت متأكد أنك تريد مسح جميع البيانات المستخرجة؟ لا يمكن التراجع عن هذا الإجراء.",
       modalCancel: "إلغاء",
       modalConfirm: "مسح الكل",
-      gmapsKwPlaceholder: "أدخل الكلمة المفتاحية...",
-      gmapsCityPlaceholder: "أدخل المدينة...",
+      gmapsKwPlaceholder: "اختر أو اكتب المجال...",
+      gmapsCityPlaceholder: "اختر أو اكتب المدينة...",
     },
   };
 
@@ -267,9 +267,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     .getElementById("lang-ar")
     .addEventListener("click", () => applyLanguage("ar"));
 
+  // Theme logic
+  let currentTheme = "light";
+  const themeToggleBtn = document.getElementById("theme-toggle");
+  const iconSun = document.getElementById("theme-icon-sun");
+  const iconMoon = document.getElementById("theme-icon-moon");
+
+  function applyTheme(theme) {
+    currentTheme = theme;
+    if (theme === "dark") {
+      document.body.setAttribute("data-theme", "dark");
+      iconMoon.classList.add("hidden");
+      iconSun.classList.remove("hidden");
+    } else {
+      document.body.removeAttribute("data-theme");
+      iconSun.classList.add("hidden");
+      iconMoon.classList.remove("hidden");
+    }
+    chrome.storage.local.set({ uiTheme: theme });
+  }
+
+  themeToggleBtn.addEventListener("click", () => {
+    applyTheme(currentTheme === "light" ? "dark" : "light");
+  });
+
   // 1. Load language preference and show scraper directly
-  chrome.storage.local.get(["uiLang"], (res) => {
+  chrome.storage.local.get(["uiLang", "uiTheme"], (res) => {
     applyLanguage(res.uiLang || "en");
+    applyTheme(res.uiTheme || "light");
     loadState();
   });
 
@@ -609,6 +634,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           downloadBtn.disabled = true;
           updateProgress();
           updateUI("idle");
+          setTimeout(() => countBtn.click(), 100);
         } else if (!response) {
           updateUI("error", "Error connecting to content script.");
         }
@@ -659,8 +685,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       const kw = gmapsKeyword.value.trim();
       const city = gmapsCity.value.trim();
       if (kw && city) {
-        const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(kw)}+in+${encodeURIComponent(city)}`;
-        chrome.tabs.create({ url: searchUrl });
+        // Save exact query to storage so the scraper doesn't rely on Google Maps URL parsing
+        chrome.storage.local.set({ lastGmapsKw: kw, lastGmapsCity: city }, () => {
+          const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(kw)}+in+${encodeURIComponent(city)}`;
+          chrome.tabs.create({ url: searchUrl });
+        });
       }
     });
   }
@@ -682,7 +711,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else {
         animateCount(countDisplay, request.count);
         if (request.currentTitle) {
-          activityLog.innerText = `Extracted: ${request.currentTitle}`;
+          activityLog.innerText = request.currentTitle;
         }
         // Update progress after animation settles
         setTimeout(updateProgress, 420);
@@ -738,7 +767,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       headers.join(","),
       ...data.map((row) => {
         const contact = row.contact || "";
-        const anrede = contact.trim().split(" ")[0] || "";
+        const firstWord = contact.trim().split(" ")[0] || "";
+        const validTitles = ["Herr", "Frau", "Dr.", "Prof.", "Herrn"];
+        const anrede = validTitles.includes(firstWord) ? firstWord : "";
+        
         const values = [
           row.company || "",
           row.email || "",
@@ -748,17 +780,18 @@ document.addEventListener("DOMContentLoaded", async () => {
           row.link || "",
           row.phone || "",
         ];
-        return values.map((v) => `"${v.replace(/"/g, '""')}"`).join(",");
+        return values.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",");
       }),
     ].join("\n");
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    // Prepend UTF-8 BOM (\uFEFF) to ensure Microsoft Excel correctly renders German umlauts (ä, ö, ü)
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
     link.setAttribute(
       "download",
-      `scraped_jobs_${new Date().toISOString().slice(0, 10)}.csv`,
+      `autoazubi_leads_${new Date().toISOString().slice(0, 10)}.csv`,
     );
     document.body.appendChild(link);
     link.click();

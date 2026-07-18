@@ -6,24 +6,31 @@
 // Listen for messages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "fetch_text") {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
     // DasÖrtliche uses ISO-8859-1 encoding
-    fetch(request.url)
+    fetch(request.url, { signal: controller.signal })
       .then((res) => {
+        clearTimeout(timeoutId);
         return res.arrayBuffer().then((buffer) => {
           const decoder = new TextDecoder("iso-8859-1");
           return decoder.decode(buffer);
         });
       })
       .then((text) => sendResponse({ success: true, text: text }))
-      .catch((err) => sendResponse({ success: false, error: err.toString() }));
+      .catch((err) => {
+        clearTimeout(timeoutId);
+        sendResponse({ success: false, error: err.toString() });
+      });
     return true; // async response
   }
 
   if (request.action === "fetch_text_utf8") {
     // UTF-8 fetch for external websites (Impressum, Kontakt pages, etc.)
-    // 5-second timeout to avoid blocking on slow/unresponsive sites
+    // 3-second timeout to avoid blocking on slow/unresponsive sites
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
 
     fetch(request.url, {
       signal: controller.signal,
