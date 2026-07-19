@@ -206,7 +206,7 @@ async function runScraping(session) {
       if (!isScraping) return;
       if (isPaused) {
         // Save current progress before entering pause wait
-        await saveSession({ limit, baseUrl, currentData, page, processedLinks: [...processedLinks] });
+        await saveSession({ limit, baseUrl, currentData, page, processedLinks: [...processedLinks], processedHits, dryPageCount });
         while (isPaused) {
           await sleep(500);
           if (!isScraping) return;
@@ -306,7 +306,12 @@ async function runScraping(session) {
 
   if (wasRunning) {
     if (settings.notifyFinish) finishedSound.play().catch(() => {});
-    chrome.runtime.sendMessage({ action: "finished", count: currentData.length });
+    chrome.runtime.sendMessage({ 
+      action: "finished", 
+      count: currentData.length,
+      early: dryPageCount >= MAX_DRY_PAGES,
+      empty: emptyPageCount >= MAX_EMPTY_PAGES 
+    });
   }
 }
 
@@ -341,6 +346,7 @@ async function handleSearchPage(limit = 50) {
   if (isScraping) return;
   isScraping = true;
   isPaused = false;
+  chrome.storage.local.set({ isScraping: true, isPaused: false });
 
   // Wait for any existing page transition to settle
   await sleep(800);
@@ -398,6 +404,7 @@ async function handleSearchPage(limit = 50) {
   console.log(`[Ausbildung] Auto-resuming session on page ${session.page}...`);
   isScraping = true;
   isPaused = false;
+  chrome.storage.local.set({ isScraping: true, isPaused: false });
 
   chrome.runtime.sendMessage({
     action: "progress",
@@ -452,7 +459,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     isScraping = false;
     isPaused = false;
     clearSession();
-    chrome.storage.local.set({ scrapedData: [] }, () => sendResponse({ status: "reset" }));
+    chrome.storage.local.set({ scrapedData: [], isScraping: false, isPaused: false }, () => sendResponse({ status: "reset" }));
     return true;
   }
   if (request.action === "start") {
@@ -463,11 +470,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   if (request.action === "pause") {
     isPaused = true;
+    chrome.storage.local.set({ isPaused: true });
     sendResponse({ status: "paused" });
     return true;
   }
   if (request.action === "resume") {
     isPaused = false;
+    chrome.storage.local.set({ isPaused: false });
     sendResponse({ status: "resumed" });
     return true;
   }
@@ -475,6 +484,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     isScraping = false;
     isPaused = false;
     clearSession();
+    chrome.storage.local.set({ isScraping: false, isPaused: false });
     sendResponse({ status: "stopped" });
     return true;
   }

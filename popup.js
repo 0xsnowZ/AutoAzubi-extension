@@ -38,20 +38,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   const countDisplay = document.getElementById("scraped-count");
   const totalDisplay = document.getElementById("total-found");
   const limitInput = document.getElementById("fetch-limit");
-  const progressBar = document.getElementById("progress-bar");
+  const progressRing = document.getElementById("progress-ring-fill");
   const progressContainer = document.getElementById("progress-container");
   const activityLog = document.getElementById("activity-log");
   const statusCard = document.getElementById("status-card");
   const pulseDot = document.getElementById("pulse-dot");
-  const progressPct = document.getElementById("progress-pct");
   const activeSiteBadge = document.getElementById("active-site-badge");
 
   function updateProgress() {
     let current = parseInt(countDisplay.innerText) || 0;
     let target = limitInput.value ? parseInt(limitInput.value) : 1;
     let percent = Math.min((current / target) * 100, 100);
-    progressBar.style.width = percent + "%";
-    if (progressPct) progressPct.innerText = Math.round(percent) + "%";
+    
+    if (progressRing) {
+      const circumference = 364.42; // 2 * pi * 58
+      const offset = circumference - (percent / 100) * circumference;
+      progressRing.style.strokeDashoffset = offset;
+    }
     // Compact the counter font when numbers are long
     const counterBlock = countDisplay.closest(".counter-block");
     if (counterBlock) {
@@ -444,8 +447,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   notifyCaptchaCheckbox.addEventListener("change", saveSettings);
   notifyFinishCheckbox.addEventListener("change", saveSettings);
+  limitInput.addEventListener("change", () => {
+    chrome.storage.local.set({ targetLimit: parseInt(limitInput.value) || 50 });
+    updateProgress();
+  });
 
-  function updateUI(status) {
+  function updateUI(status, data) {
     if (status === "running")
       statusText.innerText = i18n[currentLang]["statusRunning"];
     else if (status === "paused")
@@ -472,10 +479,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       progressContainer.classList.add("active");
       activityLog.classList.add("active");
       statusCard.classList.add("running");
-      progressBar.classList.add("progress-striped");
       if (
         activityLog.innerText === "Ready to start..." ||
-        activityLog.innerText === "Ready to download."
+        activityLog.innerText === "Ready to download." ||
+        activityLog.innerText.includes("Stopped early")
       ) {
         activityLog.innerText = "Extracting data...";
       }
@@ -487,7 +494,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       progressContainer.classList.add("active");
       activityLog.classList.add("active");
-      progressBar.classList.remove("progress-striped");
     } else if (status === "idle" || status === "finished") {
       initialBtns.classList.remove("hidden");
       ongoingBtns.classList.add("hidden");
@@ -496,15 +502,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (status === "finished") {
         progressContainer.classList.add("active");
         activityLog.classList.add("active");
-        progressBar.classList.remove("progress-striped");
-        activityLog.innerText = "Ready to download.";
-        progressBar.style.width = "100%";
-        if (progressPct) progressPct.innerText = "100%";
+        
+        if (data && (data.early || data.empty)) {
+          activityLog.innerText = "Stopped early: no more emails found.";
+        } else {
+          activityLog.innerText = "Ready to download.";
+        }
+        updateProgress(); // Sets real % instead of forcing 100%
       } else {
         progressContainer.classList.remove("active");
         activityLog.classList.remove("active");
-        progressBar.style.width = "0%";
-        if (progressPct) progressPct.innerText = "0%";
+        if (progressRing) progressRing.style.strokeDashoffset = 364.42;
         activityLog.innerText = "Ready to start...";
       }
     }
@@ -581,6 +589,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   startBtn.addEventListener("click", async () => {
     const limit = parseInt(limitInput.value) || 50;
+    chrome.storage.local.set({ targetLimit: limit });
 
     sendMessageToTab(
       { action: "start", limit, settings: getSettings() },
@@ -723,8 +732,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else if (request.action === "finished") {
       animateCount(countDisplay, request.count);
       setTimeout(() => {
-        updateUI("finished");
-        updateProgress();
+        updateUI("finished", request);
       }, 420);
       downloadBtn.disabled = false;
     } else if (request.action === "error") {

@@ -75,35 +75,37 @@
     <!-- ── Main View ───────────────────────────────── -->
     <div id="main-view" class="view active-view">
 
-      <!-- Status Card -->
+      <!-- Status Dashboard Widget -->
       <div class="status-card" id="status-card">
-        <div class="status-left">
-          <span class="status-label" data-i18n="statusTitle">Current Status</span>
-          <div class="status-value-row">
+        <div class="status-glow"></div>
+        
+        <div class="widget-header">
+          <div class="widget-title">
             <span class="pulse-dot" id="pulse-dot"></span>
             <div id="status-text" class="status-value status-idle" data-i18n="statusIdle">Idle</div>
           </div>
-          <div id="activity-log" class="activity-log">Ready to start...</div>
           <div id="active-site-badge" class="active-site-badge hidden"></div>
         </div>
-        <div class="status-right">
-          <div class="counter-block">
-            <span id="scraped-count" class="count-num">0</span>
-            <span class="count-divider">/</span>
-            <span id="total-found" class="count-total">?</span>
+        
+        <div class="widget-center">
+          <div class="progress-ring-container" id="progress-container">
+            <svg class="progress-ring" width="130" height="130">
+              <circle class="progress-ring-bg" cx="65" cy="65" r="58" stroke-width="8"></circle>
+              <circle class="progress-ring-fill" cx="65" cy="65" r="58" stroke-width="8" id="progress-ring-fill"></circle>
+            </svg>
+            <div class="ring-content">
+              <span id="scraped-count" class="count-num">0</span>
+              <span class="counter-label">EXTRACTED</span>
+            </div>
           </div>
-          <span class="counter-label">extracted</span>
         </div>
-      </div>
 
-      <!-- Progress Bar -->
-      <div class="progress-wrap" id="progress-container">
-        <div class="progress-header">
-          <span class="progress-label">Progress</span>
-          <span class="progress-pct" id="progress-pct">0%</span>
-        </div>
-        <div class="progress-track">
-          <div class="progress-fill" id="progress-bar"></div>
+        <div class="widget-footer">
+          <div class="target-info">
+            <span class="target-label">Target:</span>
+            <span id="total-found" class="target-value">?</span>
+          </div>
+          <div id="activity-log" class="activity-log">Ready to start...</div>
         </div>
       </div>
 
