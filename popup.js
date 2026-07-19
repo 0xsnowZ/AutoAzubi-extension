@@ -49,7 +49,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     let current = parseInt(countDisplay.innerText) || 0;
     let target = limitInput.value ? parseInt(limitInput.value) : 1;
     let percent = Math.min((current / target) * 100, 100);
-    
+
     if (progressRing) {
       const circumference = 364.42; // 2 * pi * 58
       const offset = circumference - (percent / 100) * circumference;
@@ -85,11 +85,34 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Detect which portal (if any) the active tab belongs to and highlight it
   function detectActivePortal(url) {
     const map = [
-      { id: "arbeitsagentur-btn", label: "Arbeitsagentur", test: (u) => u.includes("arbeitsagentur.de") },
-      { id: "ausbildung-btn",     label: "Ausbildung.de", test: (u) => u.includes("ausbildung.de") },
-      { id: "aubiplus-btn",       label: "Aubi-Plus.de", test: (u) => u.includes("aubi-plus.de") },
-      { id: "azubi-btn",          label: "Azubi.de", test: (u) => u.includes("azubi.de") },
-      { id: "gmaps-btn",          label: "Google Maps", test: (u) => u.includes("google.com/maps") || u.includes("google.de/maps") || u.includes("dasoertliche.de") },
+      {
+        id: "arbeitsagentur-btn",
+        label: "Arbeitsagentur",
+        test: (u) => u.includes("arbeitsagentur.de"),
+      },
+      {
+        id: "ausbildung-btn",
+        label: "Ausbildung.de",
+        test: (u) => u.includes("ausbildung.de"),
+      },
+      {
+        id: "aubiplus-btn",
+        label: "Aubi-Plus.de",
+        test: (u) => u.includes("aubi-plus.de"),
+      },
+      {
+        id: "azubi-btn",
+        label: "Azubi.de",
+        test: (u) => u.includes("azubi.de"),
+      },
+      {
+        id: "gmaps-btn",
+        label: "Google Maps",
+        test: (u) =>
+          u.includes("google.com/maps") ||
+          u.includes("google.de/maps") ||
+          u.includes("dasoertliche.de"),
+      },
     ];
     let matched = null;
     map.forEach(({ id, label, test }) => {
@@ -134,7 +157,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       statusRunning: "Running",
       statusPaused: "Paused",
       targetLabel: "Extraction Limit",
-      countBtn: "Calculate Total",
+      countBtn: "Count Offers",
       startBtn: "Start Extraction",
       resetBtn: "Reset",
       arbBtn: "Open Arbeitsagentur",
@@ -179,7 +202,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       statusRunning: "قيد التشغيل",
       statusPaused: "متوقف مؤقتاً",
       targetLabel: "الحد الأقصى للاستخراج",
-      countBtn: "حساب الإجمالي",
+      countBtn: "عدّ العروض",
       startBtn: "بدء الاستخراج",
       resetBtn: "إعادة ضبط",
       arbBtn: "افتح Arbeitsagentur",
@@ -207,7 +230,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       gmapsSearchBtn: "البحث في خرائط جوجل",
       gmapsBackBtn: "رجوع",
       modalTitle: "مسح البيانات",
-      modalDesc: "هل أنت متأكد أنك تريد مسح جميع البيانات المستخرجة؟ لا يمكن التراجع عن هذا الإجراء.",
+      modalDesc:
+        "هل أنت متأكد أنك تريد مسح جميع البيانات المستخرجة؟ لا يمكن التراجع عن هذا الإجراء.",
       modalCancel: "إلغاء",
       modalConfirm: "مسح الكل",
       gmapsKwPlaceholder: "اختر أو اكتب المجال...",
@@ -381,7 +405,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (
           retryCount < 3 &&
           (errorMsg.includes("Could not establish connection") ||
-          errorMsg.includes("Receiving end does not exist"))
+            errorMsg.includes("Receiving end does not exist"))
         ) {
           console.log("Content script missing. Attempting manual injection...");
           try {
@@ -502,7 +526,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (status === "finished") {
         progressContainer.classList.add("active");
         activityLog.classList.add("active");
-        
+
         if (data && (data.early || data.empty)) {
           activityLog.innerText = "Stopped early: no more emails found.";
         } else {
@@ -522,9 +546,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (downloadBtn) {
       const span = downloadBtn.querySelector("span[data-i18n]");
       if (span) {
-        span.innerText = count > 0
-          ? i18n[currentLang]["downloadBtn"]
-          : (currentLang === "ar" ? "لا توجد بيانات بعد" : "No data yet");
+        span.innerText =
+          count > 0
+            ? i18n[currentLang]["downloadBtn"]
+            : currentLang === "ar"
+              ? "لا توجد بيانات بعد"
+              : "No data yet";
       }
     }
   }
@@ -550,10 +577,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         if (response.isScraping)
           updateUI(response.isPaused ? "paused" : "running");
-        else if (response.scrapedCount > 0)
-          updateUI("finished");
-        else
-          updateUI("idle");
+        else if (response.scrapedCount > 0) updateUI("finished");
+        else updateUI("idle");
 
         // Auto-count total if not provided by getInitialInfo and not already scraping
         if (!response.total && !response.isScraping) {
@@ -695,10 +720,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       const city = gmapsCity.value.trim();
       if (kw && city) {
         // Save exact query to storage so the scraper doesn't rely on Google Maps URL parsing
-        chrome.storage.local.set({ lastGmapsKw: kw, lastGmapsCity: city }, () => {
-          const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(kw)}+in+${encodeURIComponent(city)}`;
-          chrome.tabs.create({ url: searchUrl });
-        });
+        chrome.storage.local.set(
+          { lastGmapsKw: kw, lastGmapsCity: city },
+          () => {
+            const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(kw)}+in+${encodeURIComponent(city)}`;
+            chrome.tabs.create({ url: searchUrl });
+          },
+        );
       }
     });
   }
@@ -738,7 +766,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else if (request.action === "error") {
       updateUI("idle");
       activityLog.classList.add("active");
-      activityLog.innerText = request.message || "Scraping stopped unexpectedly.";
+      activityLog.innerText =
+        request.message || "Scraping stopped unexpectedly.";
     }
   });
 
@@ -778,7 +807,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const firstWord = contact.trim().split(" ")[0] || "";
         const validTitles = ["Herr", "Frau", "Dr.", "Prof.", "Herrn"];
         const anrede = validTitles.includes(firstWord) ? firstWord : "";
-        
+
         const values = [
           row.company || "",
           row.email || "",
@@ -788,12 +817,16 @@ document.addEventListener("DOMContentLoaded", async () => {
           row.link || "",
           row.phone || "",
         ];
-        return values.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",");
+        return values
+          .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+          .join(",");
       }),
     ].join("\n");
 
     // Prepend UTF-8 BOM (\uFEFF) to ensure Microsoft Excel correctly renders German umlauts (ä, ö, ü)
-    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob(["\uFEFF" + csvContent], {
+      type: "text/csv;charset=utf-8;",
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
