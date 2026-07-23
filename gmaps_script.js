@@ -5,7 +5,8 @@ let isPaused = false;
 let scrapedData = [];
 let targetLimit = 50;
 let currentPageUrl = null;
-let processedHits = 0; // tracks pagination position for pause/resume
+let processedHits = 0;        // tracks total hits checked across all pages
+let currentHitStartIndex = 0; // tracks hit index within the current page for pause/resume
 
 // Helper function to wait
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -366,29 +367,43 @@ async function _startScraping() {
         }
 
         const hitsArray = Array.from(doc.querySelectorAll('.hit'));
-        for (let i = 0; i < hitsArray.length; i += 4) {
-            if (!isScraping || isPaused) break;
+        let pausedMidPage = false;
+        for (let i = currentHitStartIndex; i < hitsArray.length; i += 4) {
+            if (!isScraping) break;
+            if (isPaused) {
+                currentHitStartIndex = i; // remember exact position for resume
+                pausedMidPage = true;
+                break;
+            }
             if (scrapedData.length >= targetLimit) break;
 
             const chunk = hitsArray.slice(i, i + 4);
             await Promise.all(chunk.map(processHit));
-            
+
             // Save data once per chunk instead of 4 times concurrently
             chrome.storage.local.set({ scrapedData });
         }
 
-            if (!isScraping || scrapedData.length >= targetLimit) break;
+        if (!isScraping || scrapedData.length >= targetLimit) break;
 
-            const nextPageLink = doc.querySelector('.paging a[title*="chsten"]') || Array.from(doc.querySelectorAll('.paging a')).find(a => a.textContent.trim() === '›');
-            if (nextPageLink) {
-                let nextHref = nextPageLink.getAttribute('href').replace(/&amp;/g, '&');
-                if (!nextHref.startsWith('http')) {
-                    nextHref = 'https://www.dasoertliche.de' + (nextHref.startsWith('/') ? '' : '/') + nextHref;
-                }
-                currentPageUrl = nextHref;
-            } else {
-                currentPageUrl = null;
+        // Paused mid-page: don't advance to the next page URL.
+        // The outer while loop's polling block will wait for resume,
+        // then re-fetch the same page starting from currentHitStartIndex.
+        if (pausedMidPage) continue;
+
+        // Finished this page cleanly — reset the hit index for the next page.
+        currentHitStartIndex = 0;
+
+        const nextPageLink = doc.querySelector('.paging a[title*="chsten"]') || Array.from(doc.querySelectorAll('.paging a')).find(a => a.textContent.trim() === '›');
+        if (nextPageLink) {
+            let nextHref = nextPageLink.getAttribute('href').replace(/&amp;/g, '&');
+            if (!nextHref.startsWith('http')) {
+                nextHref = 'https://www.dasoertliche.de' + (nextHref.startsWith('/') ? '' : '/') + nextHref;
             }
+            currentPageUrl = nextHref;
+        } else {
+            currentPageUrl = null;
+        }
         await sleep(200);
     }
 
@@ -471,7 +486,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         case 'start':
             isScraping = true;
             isPaused = false;
-            currentPageUrl = null; // always restart from page 1 on fresh start
+            currentPageUrl = null;     // always restart from page 1 on fresh start
+            currentHitStartIndex = 0;  // always restart hit index
             if (request.reset) {
                 scrapedData = [];
                 processedHits = 0;
@@ -501,6 +517,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             isPaused = false;
             scrapedData = [];
             currentPageUrl = null;
+            currentHitStartIndex = 0;
+            processedHits = 0;
             chrome.storage.local.set({ scrapedData: [] });
             sendResponse({ status: 'reset' });
             break;
