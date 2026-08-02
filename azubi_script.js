@@ -6,149 +6,8 @@ let targetLimit = 50;
 const finishedSound = new Audio(chrome.runtime.getURL("finished.mp3"));
 let settings = { notifyFinish: true };
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-// Extract email from raw HTML — avoids DOMParser mailto: resolution issues
-function extractEmailFromHtml(html) {
-  const mailtoMatch = html.match(/href=["']mailto:([^"'?\s]+)/i);
-  if (mailtoMatch) return mailtoMatch[1].trim();
-
-  // Fallback: plain email regex
-  const emailMatch = html.match(
-    /\b([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,6})\b/,
-  );
-  if (emailMatch) return emailMatch[1].trim();
-
-  return "";
-}
-
-// Extract phone from raw HTML — only match tel: href, avoid SVG/other false positives
-function extractPhoneFromHtml(html) {
-  const telMatch = html.match(/href=["']tel:([^"'?\s]+)/i);
-  if (telMatch) return telMatch[1].trim();
-  return "";
-}
-
-// Extract company name — try JSON-LD first (most reliable), then DOM selectors
-function extractCompanyFromDoc(doc) {
-  // 1. JSON-LD structured data (most reliable)
-  const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
-  for (const script of scripts) {
-    try {
-      const data = JSON.parse(script.textContent);
-      const items = Array.isArray(data) ? data : [data];
-      for (const item of items) {
-        if (item.hiringOrganization && item.hiringOrganization.name) {
-          return item.hiringOrganization.name.trim();
-        }
-        if (item["@type"] === "Organization" && item.name) {
-          return item.name.trim();
-        }
-      }
-    } catch (e) {}
-  }
-
-  // 2. Specific DOM selectors for azubi.de
-  const selectors = [
-    '[class*="company-name"]',
-    '[class*="companyName"]',
-    '[class*="employer-name"]',
-    '[class*="employerName"]',
-    '[class*="corporation"]',
-    '[itemprop="name"]',
-    '[class*="hiring-organization"]',
-  ];
-  for (const sel of selectors) {
-    const el = doc.querySelector(sel);
-    if (el) {
-      const text = el.textContent.trim();
-      if (text && text.length < 100) return text;
-    }
-  }
-  return "";
-}
-
-// Extract address — use JSON-LD first, then itemprop, then broad text selectors
-function extractAddressFromDoc(doc) {
-  // 1. JSON-LD structured data
-  const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
-  for (const script of scripts) {
-    try {
-      const data = JSON.parse(script.textContent);
-      const items = Array.isArray(data) ? data : [data];
-      for (const item of items) {
-        // JobPosting jobLocation
-        if (item.jobLocation) {
-          const loc = Array.isArray(item.jobLocation)
-            ? item.jobLocation[0]
-            : item.jobLocation;
-          if (loc && loc.address) {
-            const addr = loc.address;
-            if (typeof addr === "string" && addr.trim()) return addr.trim();
-            // streetAddress sometimes already contains postalCode+city — avoid duplication
-            const street = addr.streetAddress || "";
-            const postal = addr.postalCode || "";
-            const city = addr.addressLocality || "";
-            if (street) {
-              // Only append postal/city if not already contained in street
-              const extra = [postal, city].filter(
-                (p) => p && !street.includes(p),
-              );
-              return extra.length ? `${street}, ${extra.join(", ")}` : street;
-            }
-            const parts = [postal, city].filter(Boolean);
-            if (parts.length) return parts.join(", ");
-          }
-          // Sometimes address is directly on the Place
-          if (loc && loc.name) return loc.name.trim();
-        }
-        // Direct address field
-        if (item.address) {
-          const addr = item.address;
-          if (typeof addr === "string" && addr.trim()) return addr.trim();
-          const parts = [
-            addr.streetAddress,
-            addr.postalCode,
-            addr.addressLocality,
-          ].filter(Boolean);
-          if (parts.length) return parts.join(", ");
-        }
-      }
-    } catch (e) {}
-  }
-
-  // 2. itemprop selectors (schema.org microdata)
-  const locality = doc.querySelector('[itemprop="addressLocality"]');
-  const postal = doc.querySelector('[itemprop="postalCode"]');
-  const street = doc.querySelector('[itemprop="streetAddress"]');
-  if (locality || postal || street) {
-    return [street, postal, locality]
-      .map((el) => (el ? el.textContent.trim() : ""))
-      .filter(Boolean)
-      .join(", ");
-  }
-
-  // 3. Location-specific selectors — must be short (< 100 chars) to avoid grabbing card text
-  const selectors = [
-    '[class*="job-location"]',
-    '[class*="jobLocation"]',
-    '[class*="location-text"]',
-    '[class*="locationText"]',
-    '[class*="standort"]',
-    '[class*="city"]',
-    '[class*="ort"]',
-    '[data-testid*="location"]',
-    '[data-testid*="address"]',
-  ];
-  for (const sel of selectors) {
-    const el = doc.querySelector(sel);
-    if (el) {
-      const text = el.textContent.replace(/📍/g, "").trim();
-      if (text && text.length < 100) return text;
-    }
-  }
-  return "";
-}
+// sleep, extractEmailFromHtml, extractPhoneFromHtml, extractCompanyFromDoc, extractAddressFromDoc
+// are provided by utils.js (loaded first via manifest.json)
 
 // Extract all unique job detail links from a parsed document
 function extractJobLinksFromDoc(doc) {
@@ -307,6 +166,13 @@ async function handleSearchPage(limit = 50) {
 
         const company = extractCompanyFromDoc(doc);
         const address = extractAddressFromDoc(doc);
+
+        // Email dedup: skip if this email was already scraped
+        const isDuplicate = currentData.some(d => d.email === email);
+        if (isDuplicate) {
+          console.log("[Azubi] Duplicate email, skipping:", email);
+          continue;
+        }
 
         currentData.push({
           company,

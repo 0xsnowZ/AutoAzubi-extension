@@ -10,102 +10,10 @@ let isPaused = false;
 const finishedSound = new Audio(chrome.runtime.getURL("finished.mp3"));
 let settings = { notifyFinish: true };
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// sleep, extractEmailFromHtml, extractCompanyFromDoc, extractAddressFromDoc
+// are provided by utils.js (loaded first via manifest.json)
 
 // ─── Data Extraction Helpers ─────────────────────────────────────────────────
-
-function extractEmailFromHtml(html) {
-  // Priority 1: explicit mailto link
-  const mailtoMatch = html.match(/href=["']mailto:([^"'?\s]+)/i);
-  if (mailtoMatch) return mailtoMatch[1].trim().toLowerCase();
-
-  // Priority 2: bare email pattern in text (not inside script/style blocks)
-  const emailMatch = html.match(
-    /\b([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,6})\b/,
-  );
-  if (emailMatch) return emailMatch[1].trim().toLowerCase();
-
-  return "";
-}
-
-function extractCompanyFromDoc(doc) {
-  // Best source: structured JSON-LD schema data (most reliable)
-  const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
-  for (const script of scripts) {
-    try {
-      const data = JSON.parse(script.textContent);
-      const items = Array.isArray(data) ? data : [data];
-      for (const item of items) {
-        if (item.hiringOrganization?.name) {
-          return item.hiringOrganization.name.trim();
-        }
-      }
-    } catch (e) {} // Malformed JSON, skip gracefully
-  }
-
-  // Fallback: DOM selectors
-  const selectors = [
-    ".jp-c-header__corporation-link",
-    '[class*="corporation-link"]',
-    '[class*="company-name"]',
-    '[class*="employer"]',
-  ];
-  for (const sel of selectors) {
-    const el = doc.querySelector(sel);
-    if (el) {
-      const text = el.textContent.trim();
-      if (text && text.length < 120) return text;
-    }
-  }
-  return "";
-}
-
-function extractAddressFromDoc(doc) {
-  // Best source: structured JSON-LD schema data
-  const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
-  for (const script of scripts) {
-    try {
-      const data = JSON.parse(script.textContent);
-      const items = Array.isArray(data) ? data : [data];
-      for (const item of items) {
-        if (item.jobLocation) {
-          const loc = Array.isArray(item.jobLocation)
-            ? item.jobLocation[0]
-            : item.jobLocation;
-          if (loc?.address) {
-            const addr = loc.address;
-            if (typeof addr === "string" && addr.trim()) return addr.trim();
-            const street = addr.streetAddress || "";
-            const postal = addr.postalCode || "";
-            const city = addr.addressLocality || "";
-            if (street) {
-              const extra = [postal, city].filter((p) => p && !street.includes(p));
-              return extra.length ? `${street}, ${extra.join(", ")}` : street;
-            }
-            const parts = [postal, city].filter(Boolean);
-            if (parts.length) return parts.join(", ");
-          }
-        }
-      }
-    } catch (e) {}
-  }
-
-  // Fallback: DOM selectors
-  const selectors = [
-    ".jp-title__address",
-    '[itemprop="addressLocality"]',
-    '[class*="job-location"]',
-    '[class*="location-text"]',
-  ];
-  for (const sel of selectors) {
-    const el = doc.querySelector(sel);
-    if (el) {
-      const text = el.textContent.replace(/📍/g, "").trim();
-      if (text && text.length < 100) return text;
-    }
-  }
-  return "";
-}
 
 function extractJobLinksFromDoc(doc) {
   const links = new Set();

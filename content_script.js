@@ -201,13 +201,19 @@ async function _startScraping() {
 
                 const info = extractInfo();
                 if (info) {
-                    const linkElement = document.getElementById(`agdarstellung-websitelink-${i}`);
-                    info.link = linkElement ? linkElement.href : '';
+                    // Email dedup: skip if this email was already scraped
+                    const isDuplicate = scrapedData.some(d => d.email === info.email);
+                    if (isDuplicate) {
+                        console.log(`Card ${i}: Duplicate email ${info.email}, skipping.`);
+                    } else {
+                        const linkElement = document.getElementById(`agdarstellung-websitelink-${i}`);
+                        info.link = linkElement ? linkElement.href : '';
 
-                    scrapedData.push(info);
-                    updateStorage();
-                    console.log(`Extracted (${scrapedData.length}/${targetLimit}):`, info);
-                    chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, currentTitle: info.company });
+                        scrapedData.push(info);
+                        updateStorage();
+                        console.log(`Extracted (${scrapedData.length}/${targetLimit}):`, info);
+                        chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, currentTitle: info.company });
+                    }
                 } else {
                     console.log(`Card ${i}: No email found, skipping.`);
                 }
@@ -448,18 +454,9 @@ function extractInfo() {
         address = lines.slice(2).join(', ');
     }
 
-    // If no email found in regular field, search in description
+    // If no email found in regular field, search in description using shared utils
     if (!email && descContainer) {
-        // Search for mailto: links
-        const mailtoMatch = descContainer.innerHTML.match(/mailto:([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6})/i);
-        if (mailtoMatch) {
-            email = mailtoMatch[1];
-        } else {
-            // Broad regex search as fallback
-            const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6})/g;
-            const textMatch = descContainer.innerText.match(emailRegex);
-            if (textMatch) email = textMatch[0];
-        }
+        email = extractEmailFromHtml(descContainer.innerHTML);
     }
 
     // Return object if we found email (already enforced above, but returning consistent object)
@@ -470,6 +467,4 @@ function extractInfo() {
     return null;
 }
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+// sleep() provided by utils.js

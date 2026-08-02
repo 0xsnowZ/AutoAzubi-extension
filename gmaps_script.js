@@ -9,7 +9,7 @@ let processedHits = 0;        // tracks total hits checked across all pages
 let currentHitStartIndex = 0; // tracks hit index within the current page for pause/resume
 
 // Helper function to wait
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+// sleep is provided by utils.js (loaded first via manifest.json)
 
 const finishedSound = new Audio(chrome.runtime.getURL('finished.mp3'));
 
@@ -86,106 +86,7 @@ async function getDasOertlicheTotal() {
     return '?';
 }
 
-function extractEmail(rawHtml) {
-    if (!rawHtml) return '';
-
-    let email = '';
-
-    // Strategy 1: href="mailto:..." on .mail anchor
-    const mailtoHref = rawHtml.match(/class="mail"[^>]*href="mailto:([^"?\s]+)"/i)
-        || rawHtml.match(/href="mailto:([^"?\s]+)"[^>]*class="mail"/i);
-    if (mailtoHref) {
-        email = mailtoHref[1].trim();
-    }
-
-    // Strategy 2: title="..." on .mail anchor
-    if (!email) {
-        const titleMatch = rawHtml.match(/class="mail"[^>]*title="([^"]+@[^"]+)"/i)
-            || rawHtml.match(/title="([^"]+@[^"]+)"[^>]*class="mail"/i);
-        if (titleMatch) email = titleMatch[1].trim();
-    }
-
-    // Strategy 3: Generic mailto: anywhere
-    if (!email) {
-        const genericMailto = rawHtml.match(/href="mailto:([^"?\s]+)"/i);
-        if (genericMailto) email = genericMailto[1].trim();
-    }
-
-    // Strategy 4: data-email attribute (common obfuscation pattern)
-    if (!email) {
-        const dataEmail = rawHtml.match(/data-email="([^"]+)"/i)
-            || rawHtml.match(/data-mail="([^"]+)"/i);
-        if (dataEmail) {
-            email = dataEmail[1].trim();
-            // Some sites encode the email with reversals or substitutions
-            email = email.replace(/\(at\)/gi, '@').replace(/\[at\]/gi, '@').replace(/\s*at\s*/gi, '@');
-            email = email.replace(/\(dot\)/gi, '.').replace(/\[dot\]/gi, '.').replace(/\s*dot\s*/gi, '.');
-        }
-    }
-
-    // Strategy 5: onclick handlers with mailto
-    if (!email) {
-        const onclickMailto = rawHtml.match(/onclick="[^"]*mailto:([^"'\s?]+)/i);
-        if (onclickMailto) email = onclickMailto[1].trim();
-    }
-
-    // Strategy 6: HTML entity encoded emails (e.g. &#109;&#97;&#105;&#108;)
-    if (!email) {
-        const entityMatch = rawHtml.match(/href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;([^"]+)"/i);
-        if (entityMatch) {
-            // Decode HTML entities
-            const textarea = document.createElement('textarea');
-            textarea.innerHTML = entityMatch[1];
-            email = textarea.value.trim();
-        }
-    }
-
-    // Strategy 7: Obfuscated emails using (at), [at], [AT], etc.
-    if (!email) {
-        const obfuscatedMatch = rawHtml.match(/[\w.\-]+\s*\[(?:at|AT)\]\s*[\w.\-]+\s*\[(?:dot|DOT)\]\s*[\w.\-]+/);
-        if (obfuscatedMatch) {
-            email = obfuscatedMatch[0].replace(/\s*\[(?:at|AT)\]\s*/g, '@').replace(/\s*\[(?:dot|DOT)\]\s*/g, '.');
-        }
-    }
-
-    // Strategy 8: Email with (at) and (dot) parentheses
-    if (!email) {
-        const parenMatch = rawHtml.match(/[\w.\-]+\s*\(at\)\s*[\w.\-]+\s*\(dot\)\s*[\w.\-]+/i);
-        if (parenMatch) {
-            email = parenMatch[0].replace(/\s*\(at\)\s*/gi, '@').replace(/\s*\(dot\)\s*/gi, '.');
-        }
-    }
-
-    // Strategy 9: Broad email regex on visible text (last resort)
-    if (!email) {
-        // Strip HTML tags to get visible text, then search for email pattern
-        const visibleText = rawHtml.replace(/<script[\s\S]*?<\/script>/gi, '')
-                                   .replace(/<style[\s\S]*?<\/style>/gi, '')
-                                   .replace(/<[^>]+>/g, ' ');
-        const emailRegex = visibleText.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
-        if (emailRegex) {
-            email = emailRegex[0].trim();
-            // Filter out obviously false positives like image filenames
-            if (/\.(png|jpg|jpeg|gif|svg|css|js|woff|ttf)$/i.test(email)) {
-                email = '';
-            }
-        }
-    }
-
-    // Clean up: decode any remaining HTML entities
-    if (email && /&#\d+;|&\w+;/.test(email)) {
-        const textarea = document.createElement('textarea');
-        textarea.innerHTML = email;
-        email = textarea.value.trim();
-    }
-
-    // Final validation: must look like a real email
-    if (email && !/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(email)) {
-        email = '';
-    }
-
-    return email;
-}
+// extractEmailFromHtml is provided by utils.js (loaded first via manifest.json)
 
 /**
  * Extract website URL from DasÖrtliche detail page HTML
@@ -244,7 +145,7 @@ async function crawlWebsiteForEmail(websiteUrl) {
         let contactPaths = ['/impressum', '/kontakt', '/imprint'];
 
         if (homeResp && homeResp.success && homeResp.text) {
-            const homeEmail = extractEmail(homeResp.text);
+            const homeEmail = extractEmailFromHtml(homeResp.text);
             if (homeEmail) {
                 console.log(`Found email on homepage: ${homeEmail}`);
                 return homeEmail;
@@ -287,7 +188,7 @@ async function crawlWebsiteForEmail(websiteUrl) {
 
             const resp = await chrome.runtime.sendMessage({ action: 'fetch_text_utf8', url: contactUrl });
             if (resp && resp.success && resp.text) {
-                const email = extractEmail(resp.text);
+                const email = extractEmailFromHtml(resp.text);
                 if (email) {
                     console.log(`Found email on ${contactUrl}: ${email}`);
                     return email;
@@ -450,7 +351,7 @@ async function processHit(hit) {
             const detailResp = await chrome.runtime.sendMessage({ action: 'fetch_text', url: detailUrl });
             if (detailResp && detailResp.success) {
                 const rawHtml = detailResp.text;
-                let email = extractEmail(rawHtml);
+                let email = extractEmailFromHtml(rawHtml);
                 
                 if (!email) {
                     const websiteUrl = extractWebsiteUrl(rawHtml);

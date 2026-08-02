@@ -6,21 +6,42 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Tabs Elements
   const tabJobs = document.getElementById("tab-jobs");
   const tabGmaps = document.getElementById("tab-gmaps");
+  const tabHistory = document.getElementById("tab-history");
+  const historyView = document.getElementById("history-view");
+  const historyList = document.getElementById("history-list");
+  const historyEmpty = document.getElementById("history-empty");
+  const clearHistoryBtn = document.getElementById("clear-history-btn");
 
   // Setup tabs logic
   tabJobs.addEventListener("click", () => {
     tabJobs.classList.add("active");
     tabGmaps.classList.remove("active");
+    if (tabHistory) tabHistory.classList.remove("active");
     mainView.classList.add("active-view");
     gmapsView.classList.remove("active-view");
+    if (historyView) historyView.classList.remove("active-view");
   });
 
   tabGmaps.addEventListener("click", () => {
     tabGmaps.classList.add("active");
     tabJobs.classList.remove("active");
+    if (tabHistory) tabHistory.classList.remove("active");
     gmapsView.classList.add("active-view");
     mainView.classList.remove("active-view");
+    if (historyView) historyView.classList.remove("active-view");
   });
+
+  if (tabHistory) {
+    tabHistory.addEventListener("click", () => {
+      tabHistory.classList.add("active");
+      tabJobs.classList.remove("active");
+      tabGmaps.classList.remove("active");
+      historyView.classList.add("active-view");
+      mainView.classList.remove("active-view");
+      gmapsView.classList.remove("active-view");
+      renderHistory();
+    });
+  }
 
   // Scraper UI Elements
   const startBtn = document.getElementById("start-btn");
@@ -44,6 +65,27 @@ document.addEventListener("DOMContentLoaded", async () => {
   const statusCard = document.getElementById("status-card");
   const pulseDot = document.getElementById("pulse-dot");
   const activeSiteBadge = document.getElementById("active-site-badge");
+
+  // Metrics elements (Group 6)
+  const metricsRow = document.getElementById("metrics-row");
+  const elapsedTimeEl = document.getElementById("elapsed-time");
+  const scrapeSpeedEl = document.getElementById("scrape-speed");
+  const etaTimeEl = document.getElementById("eta-time");
+
+  // Preview elements (Group 3)
+  const previewCount = document.getElementById("preview-count");
+  const previewTbody = document.getElementById("preview-tbody");
+  const previewEmpty = document.getElementById("preview-empty");
+  const previewTableWrap = document.getElementById("preview-table-wrap");
+
+
+  // Toast container (Group 2)
+  const toastContainer = document.getElementById("toast-container");
+
+  // ETA timer state
+  let etaInterval = null;
+  let scrapeStartTime = null;
+  let lastKnownCount = 0;
 
   function updateProgress() {
     let current = parseInt(countDisplay.innerText) || 0;
@@ -152,9 +194,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       titleText: "AutoAzubi Extractor",
       subtitleText: "Automated Data Extractor",
       statusTitle: "Current Status",
-      statusIdle: "Idle",
-      statusFinished: "Finished",
-      statusRunning: "Running",
+      statusIdle: "Ready",
+      statusFinished: "Completed",
+      statusRunning: "Extracting",
       statusPaused: "Paused",
       targetLabel: "Extraction Limit",
       countBtn: "Count Offers",
@@ -192,14 +234,26 @@ document.addEventListener("DOMContentLoaded", async () => {
       modalConfirm: "Clear All",
       gmapsKwPlaceholder: "Select or type industry...",
       gmapsCityPlaceholder: "Select or type city...",
+      tabHistory: "History",
+      previewTitle: "Data Preview",
+      previewCompany: "Company",
+      previewEmail: "Email",
+      previewEmpty: "No data extracted yet",
+      historyEmpty: "No scraping sessions yet",
+      clearHistoryBtn: "Clear",
+      toastFinished: "Extraction complete",
+      toastError: "Extraction failed",
+      toastCaptcha: "Captcha detected — solve to continue",
+      toastExported: "Data exported successfully",
+      toastReset: "All data cleared",
     },
     ar: {
       titleText: "AutoAzubi Extractor",
       subtitleText: "أداة استخراج البيانات الآلية",
       statusTitle: "الحالة الحالية",
-      statusIdle: "خامل",
+      statusIdle: "جاهز",
       statusFinished: "مكتمل",
-      statusRunning: "قيد التشغيل",
+      statusRunning: "استخراج",
       statusPaused: "متوقف مؤقتاً",
       targetLabel: "الحد الأقصى للاستخراج",
       countBtn: "عدّ العروض",
@@ -236,6 +290,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       modalConfirm: "مسح الكل",
       gmapsKwPlaceholder: "اختر أو اكتب المجال...",
       gmapsCityPlaceholder: "اختر أو اكتب المدينة...",
+      tabHistory: "السجل",
+      previewTitle: "معاينة البيانات",
+      previewCompany: "الشركة",
+      previewEmail: "البريد",
+      previewEmpty: "لم يتم استخراج بيانات بعد",
+      historyEmpty: "لا توجد جلسات استخراج بعد",
+      clearHistoryBtn: "مسح",
+      toastFinished: "اكتمل الاستخراج",
+      toastError: "فشل الاستخراج",
+      toastCaptcha: "تم اكتشاف كابتشا - قم بحلها للمتابعة",
+      toastExported: "تم تصدير البيانات بنجاح",
+      toastReset: "تم مسح جميع البيانات",
     },
   };
 
@@ -335,6 +401,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         "isScraping",
         "isPaused",
         "targetLimit",
+        "scrapeStartTime",
+        "finalElapsed",
+        "finalSpeed",
       ],
       (result) => {
         notifyCaptchaCheckbox.checked = result.notifyCaptcha !== false;
@@ -354,6 +423,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           updateUI(result.isPaused ? "paused" : "running");
         } else if (result.scrapedData && result.scrapedData.length > 0) {
           updateUI("finished");
+          // Restore final metrics for finished state
+          restoreFinishedMetrics(result);
         } else {
           updateUI("idle");
         }
@@ -426,7 +497,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             await chrome.scripting.executeScript({
               target: { tabId: currTab.id },
-              files: [scriptToInject],
+              files: ["utils.js", scriptToInject],
             });
             // Wait a bit for initialization then retry once
             setTimeout(
@@ -503,6 +574,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       progressContainer.classList.add("active");
       activityLog.classList.add("active");
       statusCard.classList.add("running");
+      if (metricsRow) metricsRow.classList.remove("hidden");
+      startEtaTimer();
       if (
         activityLog.innerText === "Ready to start..." ||
         activityLog.innerText === "Ready to download." ||
@@ -518,14 +591,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       progressContainer.classList.add("active");
       activityLog.classList.add("active");
+      stopEtaTimer();
     } else if (status === "idle" || status === "finished") {
       initialBtns.classList.remove("hidden");
       ongoingBtns.classList.add("hidden");
       statusCard.classList.remove("running");
+      stopEtaTimer();
 
       if (status === "finished") {
         progressContainer.classList.add("active");
         activityLog.classList.add("active");
+        if (metricsRow) metricsRow.classList.remove("hidden");
 
         if (data && (data.early || data.empty)) {
           activityLog.innerText = "Stopped early: no more emails found.";
@@ -536,8 +612,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else {
         progressContainer.classList.remove("active");
         activityLog.classList.remove("active");
+        if (metricsRow) metricsRow.classList.add("hidden");
         if (progressRing) progressRing.style.strokeDashoffset = 364.42;
         activityLog.innerText = "Ready to start...";
+        resetEtaDisplay();
       }
     }
 
@@ -731,13 +809,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  downloadBtn.addEventListener("click", async () => {
+  downloadBtn.addEventListener("click", () => {
     sendMessageToTab({ action: "getData" }, (response) => {
       if (response && response.data) {
         downloadCSV(response.data);
+        showToast(i18n[currentLang]["toastExported"], "success");
       }
     });
   });
+
+  // History clear button
+  if (clearHistoryBtn) {
+    clearHistoryBtn.addEventListener("click", () => {
+      if (!confirm("Clear all scraping history? This cannot be undone.")) return;
+      chrome.storage.local.set({ scrapingHistory: [] }, () => {
+        renderHistory();
+        showToast(i18n[currentLang]["toastReset"], "info");
+      });
+    });
+  }
 
   chrome.runtime.onMessage.addListener((request) => {
     if (request.action === "progress") {
@@ -745,8 +835,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         updateUI("paused");
         statusText.innerText = i18n[currentLang]["waitingCaptcha"];
         activityLog.innerText = "Captcha detected... Please solve.";
+        showToast(i18n[currentLang]["toastCaptcha"], "warning");
       } else {
         animateCount(countDisplay, request.count);
+        lastKnownCount = request.count || 0;
+        updateEtaMetrics(lastKnownCount);
         if (request.currentTitle) {
           activityLog.innerText = request.currentTitle;
         }
@@ -756,6 +849,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         // Update download button label live
         const span = downloadBtn.querySelector("span[data-i18n]");
         if (span) span.innerText = i18n[currentLang]["downloadBtn"];
+        // Update preview table
+        updatePreviewFromStorage();
       }
     } else if (request.action === "finished") {
       animateCount(countDisplay, request.count);
@@ -763,11 +858,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         updateUI("finished", request);
       }, 420);
       downloadBtn.disabled = false;
+      const count = request.count || 0;
+      saveFinalMetrics(count);
+      showToast(`${i18n[currentLang]["toastFinished"]} — ${count} leads`, "success");
+      saveToHistory(count);
+      updatePreviewFromStorage();
     } else if (request.action === "error") {
       updateUI("idle");
       activityLog.classList.add("active");
       activityLog.innerText =
         request.message || "Scraping stopped unexpectedly.";
+      showToast(i18n[currentLang]["toastError"], "error");
     }
   });
 
@@ -838,4 +939,267 @@ document.addEventListener("DOMContentLoaded", async () => {
     link.click();
     document.body.removeChild(link);
   }
+
+
+  // ─── Toast Notifications (Group 2) ──────────────────────────────────────────
+  function showToast(message, type = "info", duration = 4000) {
+    if (!toastContainer) return;
+    const toast = document.createElement("div");
+    toast.className = `toast toast-${type}`;
+    const icons = {
+      success: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
+      error: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>',
+      warning: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+      info: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>',
+    };
+    // Build toast safely — use textContent for the message to prevent XSS
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'toast-icon';
+    iconDiv.innerHTML = icons[type] || icons.info;
+    const msgSpan = document.createElement('span');
+    msgSpan.className = 'toast-msg';
+    msgSpan.textContent = message;
+    const progressDiv = document.createElement('div');
+    progressDiv.className = 'toast-progress';
+    progressDiv.innerHTML = '<div class="toast-progress-bar"></div>';
+    toast.appendChild(iconDiv);
+    toast.appendChild(msgSpan);
+    toast.appendChild(progressDiv);
+    toastContainer.appendChild(toast);
+    // Trigger entrance animation
+    requestAnimationFrame(() => toast.classList.add("toast-show"));
+
+    // Auto-dismiss
+    const progressBar = toast.querySelector(".toast-progress-bar");
+    if (progressBar) {
+      progressBar.style.transition = `width ${duration}ms linear`;
+      requestAnimationFrame(() => (progressBar.style.width = "0%"));
+    }
+    setTimeout(() => {
+      toast.classList.remove("toast-show");
+      toast.classList.add("toast-hide");
+      setTimeout(() => toast.remove(), 300);
+    }, duration);
+  }
+
+  // ─── Data Preview (Group 3) ─────────────────────────────────────────────────
+  function updatePreviewFromStorage() {
+    sendMessageToTab({ action: "getData" }, (response) => {
+      if (response && response.data) {
+        renderPreviewTable(response.data);
+      }
+    });
+  }
+
+  function renderPreviewTable(data) {
+    if (!previewTbody || !previewCount || !previewEmpty || !previewTableWrap) return;
+    previewCount.textContent = data.length;
+    if (data.length === 0) {
+      previewEmpty.classList.remove("hidden");
+      previewTableWrap.classList.add("hidden");
+      return;
+    }
+    previewEmpty.classList.add("hidden");
+    previewTableWrap.classList.remove("hidden");
+    // Show last 50 entries, most recent first
+    const recent = data.slice(-50).reverse();
+    previewTbody.innerHTML = recent
+      .map(
+        (row, i) => `<tr>
+        <td>${data.length - i}</td>
+        <td title="${(row.company || "").replace(/"/g, "&quot;")}">${truncate(row.company || "—", 22)}</td>
+        <td title="${(row.email || "").replace(/"/g, "&quot;")}">${truncate(row.email || "—", 24)}</td>
+      </tr>`,
+      )
+      .join("");
+  }
+
+  function truncate(str, max) {
+    return str.length > max ? str.slice(0, max - 1) + "…" : str;
+  }
+
+  // ─── Scraping History (Group 4) ─────────────────────────────────────────────
+  function saveToHistory(count) {
+    chrome.storage.local.get(["scrapingHistory", "scrapeStartTime"], (result) => {
+      const history = result.scrapingHistory || [];
+      const startTime = result.scrapeStartTime || Date.now();
+      const durationMs = Date.now() - startTime;
+      const portal = detectActivePortalName();
+      history.unshift({
+        id: Date.now().toString(36),
+        portal,
+        date: new Date().toISOString(),
+        leadsFound: count,
+        durationMs,
+      });
+      // Keep only last 20 sessions
+      if (history.length > 20) history.length = 20;
+      chrome.storage.local.set({ scrapingHistory: history });
+    });
+  }
+
+  function detectActivePortalName() {
+    const badge = activeSiteBadge;
+    if (badge && badge.textContent) return badge.textContent.trim();
+    return "Unknown";
+  }
+
+  function renderHistory() {
+    if (!historyList || !historyEmpty) return;
+    chrome.storage.local.get(["scrapingHistory"], (result) => {
+      const history = result.scrapingHistory || [];
+      if (history.length === 0) {
+        historyEmpty.classList.remove("hidden");
+        historyList.querySelectorAll(".history-card").forEach((c) => c.remove());
+        return;
+      }
+      historyEmpty.classList.add("hidden");
+      const cards = history
+        .map((s) => {
+          const date = new Date(s.date);
+          const dateStr = date.toLocaleDateString("de-DE", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          });
+          const timeStr = date.toLocaleTimeString("de-DE", {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          const dur = formatDuration(s.durationMs || 0);
+          const speed = s.durationMs > 6000 ? ((s.leadsFound / (s.durationMs / 60000)).toFixed(1) + "/min") : "—";
+          const portalSafe = (s.portal || "Unknown").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          return `<div class="history-card">
+            <div class="timeline-dot"></div>
+            <div class="timeline-body">
+              <div class="timeline-top">
+                <span class="history-portal-badge">${portalSafe}</span>
+                <span class="history-leads-count">${s.leadsFound} <span class="history-leads-unit">leads</span></span>
+              </div>
+              <div class="timeline-meta">
+                <span>${timeStr} · ${dateStr}</span>
+                <span class="timeline-pills">
+                  <span class="timeline-pill">${speed}</span>
+                  <span class="timeline-pill">${dur}</span>
+                </span>
+              </div>
+            </div>
+          </div>`;
+        })
+        .join("");
+      // Remove old cards, keep the empty message element
+      historyList.querySelectorAll(".history-card").forEach((c) => c.remove());
+      historyList.insertAdjacentHTML("beforeend", cards);
+    });
+  }
+
+  function formatDuration(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    if (min === 0) return `${sec}s`;
+    return `${min}m ${sec}s`;
+  }
+
+  // ─── ETA Timer & Metrics (Group 6) ──────────────────────────────────────────
+  function startEtaTimer() {
+    chrome.storage.local.get(["scrapeStartTime"], (result) => {
+      scrapeStartTime = result.scrapeStartTime || Date.now();
+      if (!result.scrapeStartTime) {
+        chrome.storage.local.set({ scrapeStartTime });
+      }
+      stopEtaTimer();
+      etaInterval = setInterval(tickElapsed, 1000);
+      tickElapsed();
+    });
+  }
+
+  function stopEtaTimer() {
+    if (etaInterval) {
+      clearInterval(etaInterval);
+      etaInterval = null;
+    }
+  }
+
+  function resetEtaDisplay() {
+    if (elapsedTimeEl) elapsedTimeEl.textContent = "0:00";
+    if (scrapeSpeedEl) scrapeSpeedEl.textContent = "—";
+    if (etaTimeEl) etaTimeEl.textContent = "—";
+    scrapeStartTime = null;
+    lastKnownCount = 0;
+    chrome.storage.local.remove(["scrapeStartTime", "finalElapsed", "finalSpeed"]);
+  }
+
+  function tickElapsed() {
+    if (!scrapeStartTime || !elapsedTimeEl) return;
+    const elapsed = Math.floor((Date.now() - scrapeStartTime) / 1000);
+    elapsedTimeEl.textContent = formatTimer(elapsed);
+  }
+
+  function updateEtaMetrics(count) {
+    if (!scrapeStartTime) return;
+    const elapsedSec = (Date.now() - scrapeStartTime) / 1000;
+    const elapsedMin = elapsedSec / 60;
+    // Speed
+    if (scrapeSpeedEl && elapsedMin > 0.1) {
+      const speed = count / elapsedMin;
+      scrapeSpeedEl.textContent = speed.toFixed(1) + "/min";
+    }
+    // ETA
+    const target = parseInt(limitInput.value) || 50;
+    if (etaTimeEl && count > 0 && count < target) {
+      const rate = count / elapsedSec; // leads per second
+      const remaining = (target - count) / rate;
+      etaTimeEl.textContent = "~" + formatTimer(Math.ceil(remaining));
+    } else if (etaTimeEl && count >= target) {
+      etaTimeEl.textContent = "Done";
+    }
+  }
+
+  /**
+   * Save final metrics to storage when scrape finishes,
+   * so they can be restored when popup reopens.
+   */
+  function saveFinalMetrics(count) {
+    if (!scrapeStartTime) return;
+    const elapsedSec = (Date.now() - scrapeStartTime) / 1000;
+    const elapsedMin = elapsedSec / 60;
+    const finalElapsed = formatTimer(Math.floor(elapsedSec));
+    const finalSpeed = elapsedMin > 0.1
+      ? (count / elapsedMin).toFixed(1) + "/min"
+      : "—";
+    // Persist so popup reopen shows correct values
+    chrome.storage.local.set({ finalElapsed, finalSpeed });
+    // Update UI immediately
+    if (elapsedTimeEl) elapsedTimeEl.textContent = finalElapsed;
+    if (scrapeSpeedEl) scrapeSpeedEl.textContent = finalSpeed;
+    if (etaTimeEl) etaTimeEl.textContent = "Done";
+  }
+
+  /**
+   * Restore saved metrics when popup reopens and state is 'finished'.
+   */
+  function restoreFinishedMetrics(storageResult) {
+    if (!metricsRow) return;
+    const elapsed = storageResult.finalElapsed;
+    const speed = storageResult.finalSpeed;
+    if (elapsed || speed) {
+      metricsRow.classList.remove("hidden");
+      if (elapsedTimeEl) elapsedTimeEl.textContent = elapsed || "—";
+      if (scrapeSpeedEl) scrapeSpeedEl.textContent = speed || "—";
+      if (etaTimeEl) etaTimeEl.textContent = "Done";
+    } else {
+      // No stored metrics (old scrape before update) — hide the row
+      metricsRow.classList.add("hidden");
+    }
+  }
+
+  function formatTimer(totalSec) {
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    return `${min}:${sec.toString().padStart(2, "0")}`;
+  }
+
+  // Load preview on popup open
+  updatePreviewFromStorage();
 });

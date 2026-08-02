@@ -60,6 +60,9 @@ async function handleSearchPage(limit = 50) {
         chrome.storage.local.get(['scrapedData'], res => r(res.scrapedData || []));
     });
 
+    // Build URL dedup set from existing data to avoid duplicates on re-runs
+    const seenUrls = new Set(currentData.map(d => d.link).filter(Boolean));
+
     let keepGoing = true;
     let currentPage = 1;
 
@@ -79,7 +82,7 @@ async function handleSearchPage(limit = 50) {
             let nextBtn = docToSearch.querySelector('li.page-item a[rel="next"]') ||
                 docToSearch.querySelector('a.page-link[aria-label*="Next"]') ||
                 docToSearch.querySelector('a.page-link[aria-label*="Weiter"]') ||
-                Array.from(docToSearch.querySelectorAll('ul.pagination a.page-link')).find(a => a.innerText.includes('»') || a.innerText.includes('Weiter') || a.innerText.includes('Nächste'));
+                Array.from(docToSearch.querySelectorAll('ul.pagination a.page-link')).find(a => (a.textContent || '').includes('»') || (a.textContent || '').includes('Weiter') || (a.textContent || '').includes('Nächste'));
 
             if (!nextBtn || !nextBtn.href) {
                 console.log("No next page button found. Pagination ends.");
@@ -134,56 +137,46 @@ async function handleSearchPage(limit = 50) {
                 href = 'https://www.aubi-plus.de' + href;
             }
 
+            // Skip duplicate URLs
+            if (seenUrls.has(href)) continue;
+
             try {
                 const response = await fetch(href);
                 const text = await response.text();
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(text, 'text/html');
 
-                // Extract fields
-                const companyNameEl = doc.querySelector('.fs-6.mb-0.lh-1');
-                const companyName = companyNameEl ? companyNameEl.innerText.replace(/\s+/g, ' ').trim() : '';
+                // Use shared utils.js functions (resilient to site template changes)
+                const companyName = extractCompanyFromDoc(doc) ||
+                    (() => {
+                        // Aubi-Plus-specific fallback
+                        const el = doc.querySelector('.fs-6.mb-0.lh-1');
+                        return el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
+                    })();
 
-                let address = '';
-                const locationIcons = doc.querySelectorAll('.fa-location-dot');
-                for (let icon of locationIcons) {
-                    if (icon.nextElementSibling && icon.nextElementSibling.tagName === 'SPAN') {
-                        address = icon.nextElementSibling.innerText.trim();
-                        break;
-                    }
-                }
-
-                let email = '';
-                // Check class mail-protect, or ID emailbewerbung, or regex inside card-body
-                const emailBewerbung = doc.querySelector('#emailbewerbung');
-                if (emailBewerbung && emailBewerbung.href && emailBewerbung.href.includes('mailto:')) {
-                    email = emailBewerbung.href.replace('mailto:', '').split('?')[0].trim();
-                } else {
-                    const mailtoLinks = Array.from(doc.querySelectorAll('a[href^="mailto:"]'));
-                    const emailLink = mailtoLinks.find(a => a.href.includes('@'));
-                    if (emailLink) {
-                        email = emailLink.href.replace('mailto:', '').split('?')[0].trim();
-                    } else {
-                        // Fallback logic
-                        const cardBodies = doc.querySelectorAll('.card-body.p-4');
-                        for (let cb of cardBodies) {
-                            const textContent = cb.innerText || '';
-                            const ematch = textContent.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
-                            if (ematch) {
-                                email = ematch[1];
-                                break;
+                const address = extractAddressFromDoc(doc) ||
+                    (() => {
+                        // Aubi-Plus-specific fallback: icon neighbor
+                        const icons = doc.querySelectorAll('.fa-location-dot');
+                        for (let icon of icons) {
+                            if (icon.nextElementSibling && icon.nextElementSibling.tagName === 'SPAN') {
+                                return icon.nextElementSibling.textContent.trim();
                             }
                         }
-                    }
-                }
+                        return '';
+                    })();
 
-                // Phone number
-                const phoneEl = doc.querySelector('.phoneNumber');
-                const phone = phoneEl ? phoneEl.innerText.trim() : '';
+                const email = extractEmailFromHtml(text);
+                const phone = extractPhoneFromHtml(text) ||
+                    (() => {
+                        const el = doc.querySelector('.phoneNumber');
+                        return el ? el.textContent.trim() : '';
+                    })();
 
                 if (!email) continue; // Skip if no email found
 
                 if (companyName || email || address || phone) {
+                    seenUrls.add(href);
                     currentData.push({
                         company: companyName,
                         email: email,

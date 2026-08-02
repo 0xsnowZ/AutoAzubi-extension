@@ -70,6 +70,14 @@
         </svg>
         <span data-i18n="tabGmaps">Google Maps</span>
       </button>
+      <button id="tab-history" class="tab-btn" role="tab">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        <span data-i18n="tabHistory">History</span>
+      </button>
     </nav>
 
     <!-- ── Main View ───────────────────────────────── -->
@@ -78,7 +86,7 @@
       <!-- Status Dashboard Widget -->
       <div class="status-card" id="status-card">
         <div class="status-glow"></div>
-        
+
         <div class="widget-header">
           <div class="widget-title">
             <span class="pulse-dot" id="pulse-dot"></span>
@@ -86,12 +94,13 @@
           </div>
           <div id="active-site-badge" class="active-site-badge hidden"></div>
         </div>
-        
+
         <div class="widget-center">
           <div class="progress-ring-container" id="progress-container">
             <svg class="progress-ring" width="130" height="130">
               <circle class="progress-ring-bg" cx="65" cy="65" r="58" stroke-width="8"></circle>
-              <circle class="progress-ring-fill" cx="65" cy="65" r="58" stroke-width="8" id="progress-ring-fill"></circle>
+              <circle class="progress-ring-fill" cx="65" cy="65" r="58" stroke-width="8" id="progress-ring-fill">
+              </circle>
             </svg>
             <div class="ring-content">
               <span id="scraped-count" class="count-num">0</span>
@@ -106,6 +115,23 @@
             <span id="total-found" class="target-value">?</span>
           </div>
           <div id="activity-log" class="activity-log">Ready to start...</div>
+        </div>
+
+        <div class="metrics-row hidden" id="metrics-row">
+          <div class="metric">
+            <span class="metric-label">Elapsed</span>
+            <span class="metric-value" id="elapsed-time">0:00</span>
+          </div>
+          <div class="metric-divider"></div>
+          <div class="metric">
+            <span class="metric-label">Speed</span>
+            <span class="metric-value" id="scrape-speed">&mdash;</span>
+          </div>
+          <div class="metric-divider"></div>
+          <div class="metric">
+            <span class="metric-label">ETA</span>
+            <span class="metric-value" id="eta-time">&mdash;</span>
+          </div>
         </div>
       </div>
 
@@ -279,7 +305,42 @@
                   challenges manually to resume data extraction.</span></span>
             </div>
           </div>
+        </details>
       </div>
+
+      <!-- Data Preview Panel -->
+      <details class="preview-section" id="preview-section">
+        <summary>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+          <span data-i18n="previewTitle">Data Preview</span>
+          <span class="preview-count" id="preview-count">0</span>
+          <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </summary>
+        <div class="preview-content">
+          <div class="preview-table-wrap" id="preview-table-wrap">
+            <table class="preview-table" id="preview-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th data-i18n="previewCompany">Company</th>
+                  <th data-i18n="previewEmail">Email</th>
+                </tr>
+              </thead>
+              <tbody id="preview-tbody"></tbody>
+            </table>
+          </div>
+          <div class="preview-empty" id="preview-empty" data-i18n="previewEmpty">No data extracted yet</div>
+        </div>
+      </details>
     </div>
 
     <!-- ── Google Maps View ────────────────────────── -->
@@ -303,26 +364,19 @@
         <input type="text" id="gmaps-keyword" list="keyword-options" placeholder="e.g. IT, Ausbildung..."
           data-i18n-placeholder="gmapsKwPlaceholder" />
         <datalist id="keyword-options">
-          <!-- Fachinformatiker / Ausbildung -->
           <option value="Anwendungsentwicklung"></option>
           <option value="Systemintegration"></option>
           <option value="Softwareentwicklung"></option>
           <option value="Netzwerktechnik"></option>
           <option value="IT"></option>
-
-          <!-- Medizin / Pflege -->
           <option value="Pflege"></option>
           <option value="Klinik"></option>
           <option value="Krankenhaus"></option>
           <option value="Pflegedienst"></option>
           <option value="Altenpflege"></option>
-
-          <!-- Handwerk -->
           <option value="Sanitär"></option>
           <option value="Heizung"></option>
           <option value="Elektriker"></option>
-
-          <!-- Einzelhandel / Gastro / Logistik -->
           <option value="Einzelhandel"></option>
           <option value="Restaurant"></option>
           <option value="Hotel"></option>
@@ -330,7 +384,7 @@
         </datalist>
       </div>
       <div class="input-group">
-        <label for="gmaps-city" data-i18n="gmapsCityParams">City / Location</label>
+        <label for="gmaps-city" data-i18n="gmapsCityParams">Target City</label>
         <input type="text" id="gmaps-city" list="city-options" placeholder="e.g. Berlin, München..."
           data-i18n-placeholder="gmapsCityPlaceholder" />
         <datalist id="city-options">
@@ -373,6 +427,17 @@
       </div>
     </div>
 
+    <!-- ── History View ──────────────────────────────── -->
+    <div id="history-view" class="view">
+      <div class="history-header">
+        <h2 class="history-title" data-i18n="tabHistory">History</h2>
+        <button id="clear-history-btn" class="btn btn-ghost btn-sm" data-i18n="clearHistoryBtn">Clear</button>
+      </div>
+      <div id="history-list" class="history-list">
+        <div class="history-empty" id="history-empty" data-i18n="historyEmpty">No scraping sessions yet</div>
+      </div>
+    </div>
+
   </div><!-- /.shell -->
 
   <!-- ── Confirm Modal ───────────────────────────── -->
@@ -394,6 +459,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
 
   <script src="popup.js"></script>
 </body>

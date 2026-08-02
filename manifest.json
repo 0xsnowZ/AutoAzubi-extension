@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "AutoAzubi Extractor",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Automatically extracts Ausbildung job listings and contact details from multiple job portals",
-  "permissions": ["activeTab", "storage", "downloads", "scripting"],
+  "permissions": ["activeTab", "storage", "scripting"],
   "host_permissions": [
     "*://*.arbeitsagentur.de/*",
     "*://*.ausbildung.de/*",
@@ -47,19 +47,19 @@
   "content_scripts": [
     {
       "matches": ["*://*.arbeitsagentur.de/*"],
-      "js": ["content_script.js"]
+      "js": ["utils.js", "content_script.js"]
     },
     {
       "matches": ["*://*.ausbildung.de/*"],
-      "js": ["ausbildung_script.js"]
+      "js": ["utils.js", "ausbildung_script.js"]
     },
     {
       "matches": ["*://*.aubi-plus.de/*"],
-      "js": ["aubiplus_script.js"]
+      "js": ["utils.js", "aubiplus_script.js"]
     },
     {
       "matches": ["*://*.azubi.de/*"],
-      "js": ["azubi_script.js"]
+      "js": ["utils.js", "azubi_script.js"]
     },
     {
       "matches": [
@@ -68,7 +68,7 @@
         "*://maps.google.com/*",
         "*://maps.google.de/*"
       ],
-      "js": ["gmaps_script.js"]
+      "js": ["utils.js", "gmaps_script.js"]
     }
   ],
   "background": {
