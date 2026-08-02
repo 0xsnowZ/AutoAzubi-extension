@@ -345,85 +345,109 @@
 
     <!-- ── Google Maps View ────────────────────────── -->
     <div id="gmaps-view" class="view">
-      <div class="gmaps-header">
-        <div class="gmaps-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-            <circle cx="12" cy="10" r="3"></circle>
-          </svg>
+
+      <!-- Hero Banner -->
+      <div class="gmaps-hero-banner">
+        <div class="gmaps-hero-bg"></div>
+        <div class="gmaps-hero-overlay"></div>
+        <div class="gmaps-coords-chip">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>
+          52.52 &ndash; 13.40
         </div>
-        <div>
-          <h2 class="gmaps-title" data-i18n="gmapsTitle">Google Maps Extractor</h2>
-          <p class="gmaps-subtitle">Search via Google Maps directly</p>
+        <div class="gmaps-hero-content">
+          <div class="gmaps-pin-badge">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+            </svg>
+          </div>
+          <div class="gmaps-hero-text">
+            <h2 class="gmaps-title" data-i18n="gmapsTitle">Google Maps Extractor</h2>
+            <p class="gmaps-subtitle">Search &amp; extract business contacts</p>
+          </div>
         </div>
       </div>
 
-      <div class="input-group">
-        <label for="gmaps-keyword" data-i18n="gmapsKwParams">Search Industry</label>
-        <input type="text" id="gmaps-keyword" list="keyword-options" placeholder="e.g. IT, Ausbildung..."
-          data-i18n-placeholder="gmapsKwPlaceholder" />
-        <datalist id="keyword-options">
-          <option value="Anwendungsentwicklung"></option>
-          <option value="Systemintegration"></option>
-          <option value="Softwareentwicklung"></option>
-          <option value="Netzwerktechnik"></option>
-          <option value="IT"></option>
-          <option value="Pflege"></option>
-          <option value="Klinik"></option>
-          <option value="Krankenhaus"></option>
-          <option value="Pflegedienst"></option>
-          <option value="Altenpflege"></option>
-          <option value="Sanitär"></option>
-          <option value="Heizung"></option>
-          <option value="Elektriker"></option>
-          <option value="Einzelhandel"></option>
-          <option value="Restaurant"></option>
-          <option value="Hotel"></option>
-          <option value="Spedition"></option>
-        </datalist>
-      </div>
-      <div class="input-group">
-        <label for="gmaps-city" data-i18n="gmapsCityParams">Target City</label>
-        <input type="text" id="gmaps-city" list="city-options" placeholder="e.g. Berlin, München..."
-          data-i18n-placeholder="gmapsCityPlaceholder" />
-        <datalist id="city-options">
-          <option value="Berlin"></option>
-          <option value="München"></option>
-          <option value="Hamburg"></option>
-          <option value="Köln"></option>
-          <option value="Frankfurt"></option>
-          <option value="Stuttgart"></option>
-          <option value="Düsseldorf"></option>
-          <option value="Leipzig"></option>
-          <option value="Dortmund"></option>
-          <option value="Essen"></option>
-          <option value="Bremen"></option>
-          <option value="Dresden"></option>
-          <option value="Hannover"></option>
-          <option value="Nürnberg"></option>
-        </datalist>
+      <!-- Inputs card -->
+      <div class="gmaps-fields-card">
+        <div class="gmaps-field-row">
+          <div class="gmaps-field-icon gmaps-field-icon--search">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </div>
+          <div class="gmaps-field-body">
+            <span class="gmaps-field-label">INDUSTRY</span>
+            <input class="gmaps-field-input" type="text" id="gmaps-keyword" list="keyword-options"
+              placeholder="e.g. IT, Pflege, Restaurant..." data-i18n-placeholder="gmapsKwPlaceholder" />
+            <datalist id="keyword-options">
+              <option value="Anwendungsentwicklung"></option>
+              <option value="Systemintegration"></option>
+              <option value="Softwareentwicklung"></option>
+              <option value="Netzwerktechnik"></option>
+              <option value="IT"></option>
+              <option value="Pflege"></option>
+              <option value="Klinik"></option>
+              <option value="Krankenhaus"></option>
+              <option value="Pflegedienst"></option>
+              <option value="Altenpflege"></option>
+              <option value="Sanitär"></option>
+              <option value="Heizung"></option>
+              <option value="Elektriker"></option>
+              <option value="Einzelhandel"></option>
+              <option value="Restaurant"></option>
+              <option value="Hotel"></option>
+              <option value="Spedition"></option>
+            </datalist>
+          </div>
+        </div>
+        <div class="gmaps-field-divider"></div>
+        <div class="gmaps-field-row">
+          <div class="gmaps-field-icon gmaps-field-icon--pin">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+            </svg>
+          </div>
+          <div class="gmaps-field-body">
+            <span class="gmaps-field-label">CITY</span>
+            <input class="gmaps-field-input" type="text" id="gmaps-city" list="city-options"
+              placeholder="e.g. Berlin, München..." data-i18n-placeholder="gmapsCityPlaceholder" />
+            <datalist id="city-options">
+              <option value="Berlin"></option>
+              <option value="München"></option>
+              <option value="Hamburg"></option>
+              <option value="Köln"></option>
+              <option value="Frankfurt"></option>
+              <option value="Stuttgart"></option>
+              <option value="Düsseldorf"></option>
+              <option value="Leipzig"></option>
+              <option value="Dortmund"></option>
+              <option value="Essen"></option>
+              <option value="Bremen"></option>
+              <option value="Dresden"></option>
+              <option value="Hannover"></option>
+              <option value="Nürnberg"></option>
+            </datalist>
+          </div>
+        </div>
       </div>
 
-      <div class="gmaps-actions">
-        <button id="gmaps-search-btn" class="btn btn-primary">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <span data-i18n="gmapsSearchBtn">Search on Maps</span>
-        </button>
-      </div>
-
-      <div class="gmaps-tip">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8" x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      <!-- Search CTA -->
+      <button id="gmaps-search-btn" class="btn btn-gmaps-cta">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <span>After searching, click <strong>Start Scraping</strong> in the Job Portals tab.</span>
+        <span data-i18n="gmapsSearchBtn">Search on Google Maps</span>
+        <svg class="gmaps-cta-arrow" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+        </svg>
+      </button>
+
+      <!-- Tip -->
+      <div class="gmaps-tip">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>After searching, switch to <strong>Job Portals</strong> and click <strong>Start Extraction</strong>.</span>
       </div>
     </div>
 
