@@ -256,9 +256,11 @@ body[dir="rtl"] {
 }
 
 body[data-theme="dark"] .status-card {
-  background: rgba(22, 24, 29, 0.85);
+  background: var(--card);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 4px 20px -6px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    0 4px 20px -6px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .status-glow {
@@ -1242,8 +1244,8 @@ details.settings-section[open] summary .chevron {
   color: #fff;
   flex-shrink: 0;
   box-shadow:
-    0 6px 18px rgba(232, 72, 60, 0.6),
-    0 0 0 3px rgba(255, 255, 255, 0.25);
+    0 4px 14px rgba(232, 72, 60, 0.35),
+    0 0 0 3px rgba(255, 255, 255, 0.15);
   animation: pin-float 3s ease-in-out infinite;
 }
 
@@ -1286,9 +1288,9 @@ body[data-theme="dark"] .gmaps-subtitle {
 
 body[data-theme="dark"] .gmaps-hero-overlay {
   background: linear-gradient(to top,
-      rgba(4, 4, 8, 0.9) 0%,
-      rgba(4, 4, 8, 0.45) 55%,
-      rgba(4, 4, 8, 0.08) 100%);
+      rgba(19, 18, 22, 0.92) 0%,
+      rgba(19, 18, 22, 0.35) 55%,
+      rgba(19, 18, 22, 0.05) 100%);
 }
 
 /* ── Fields Card ───────────────────────────────────── */
@@ -1398,12 +1400,14 @@ body[data-theme="dark"] .gmaps-hero-overlay {
 }
 
 body[data-theme="dark"] .gmaps-fields-card {
-  background: rgba(28, 31, 38, 0.55);
+  background: var(--card);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-color: rgba(255, 255, 255, 0.07);
-  border-top-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.08);
+  border-top-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 4px 16px -4px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 body[data-theme="dark"] .gmaps-fields-card:focus-within {
@@ -1520,9 +1524,9 @@ body[data-theme="dark"] .gmaps-field-icon--pin {
   align-items: center;
   font-size: 11px;
   color: var(--text-muted);
-  background: rgba(239, 83, 80, 0.04);
-  border: 1px solid rgba(239, 83, 80, 0.1);
-  border-left: 3px solid rgba(239, 83, 80, 0.45);
+  background: rgba(99, 102, 241, 0.04);
+  border: 1px solid rgba(99, 102, 241, 0.08);
+  border-left: 3px solid rgba(99, 102, 241, 0.35);
   border-radius: var(--radius-sm);
   padding: 9px 12px;
   line-height: 1.45;
@@ -1530,8 +1534,8 @@ body[data-theme="dark"] .gmaps-field-icon--pin {
 
 .gmaps-tip svg {
   flex-shrink: 0;
-  color: #ef5350;
-  opacity: 0.7;
+  color: var(--accent);
+  opacity: 0.6;
 }
 
 .gmaps-tip strong {
@@ -2005,10 +2009,10 @@ details.settings-section[open] .settings-content {
 }
 
 body[data-theme="dark"] .toast {
-  background: rgba(28, 31, 38, 0.95);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: var(--card);
+  border-color: rgba(255, 255, 255, 0.08);
   color: var(--text);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 /* ── Metrics Row (Group 6) ─────────────────────────── */
@@ -2059,7 +2063,7 @@ body[data-theme="dark"] .toast {
 }
 
 body[data-theme="dark"] .metrics-row {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.025);
   border-top-color: rgba(255, 255, 255, 0.06);
 }
 
