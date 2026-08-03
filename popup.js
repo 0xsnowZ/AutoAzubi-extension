@@ -803,6 +803,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           () => {
             const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(kw)}+in+${encodeURIComponent(city)}`;
             chrome.tabs.create({ url: searchUrl });
+            // Auto-switch to Job Portals tab so user is ready to scrape
+            tabJobs.click();
           },
         );
       }
@@ -818,14 +820,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
-  // History clear button
+  // History clear button — uses modal instead of confirm() (blocked in MV3 popups)
   if (clearHistoryBtn) {
     clearHistoryBtn.addEventListener("click", () => {
-      if (!confirm("Clear all scraping history? This cannot be undone.")) return;
-      chrome.storage.local.set({ scrapingHistory: [] }, () => {
-        renderHistory();
-        showToast(i18n[currentLang]["toastReset"], "info");
-      });
+      const modal = document.getElementById("confirmModal");
+      const confirmBtn = document.getElementById("modalConfirm");
+      const cancelBtn = document.getElementById("modalCancel");
+
+      modal.classList.add("show");
+
+      confirmBtn.onclick = () => {
+        modal.classList.remove("show");
+        chrome.storage.local.set({ scrapingHistory: [] }, () => {
+          renderHistory();
+          showToast(i18n[currentLang]["toastReset"], "info");
+        });
+      };
+
+      cancelBtn.onclick = () => {
+        modal.classList.remove("show");
+      };
     });
   }
 
@@ -1005,15 +1019,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     previewTableWrap.classList.remove("hidden");
     // Show last 50 entries, most recent first
     const recent = data.slice(-50).reverse();
-    previewTbody.innerHTML = recent
-      .map(
-        (row, i) => `<tr>
-        <td>${data.length - i}</td>
-        <td title="${(row.company || "").replace(/"/g, "&quot;")}">${truncate(row.company || "—", 22)}</td>
-        <td title="${(row.email || "").replace(/"/g, "&quot;")}">${truncate(row.email || "—", 24)}</td>
-      </tr>`,
-      )
-      .join("");
+    previewTbody.innerHTML = "";
+    recent.forEach((row, i) => {
+      const tr = document.createElement("tr");
+      const tdNum = document.createElement("td");
+      tdNum.textContent = data.length - i;
+      const tdCompany = document.createElement("td");
+      tdCompany.textContent = truncate(row.company || "\u2014", 22);
+      tdCompany.title = row.company || "";
+      const tdEmail = document.createElement("td");
+      tdEmail.textContent = truncate(row.email || "\u2014", 24);
+      tdEmail.title = row.email || "";
+      tr.append(tdNum, tdCompany, tdEmail);
+      previewTbody.appendChild(tr);
+    });
   }
 
   function truncate(str, max) {
@@ -1056,42 +1075,65 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
       historyEmpty.classList.add("hidden");
-      const cards = history
-        .map((s) => {
-          const date = new Date(s.date);
-          const dateStr = date.toLocaleDateString("de-DE", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          });
-          const timeStr = date.toLocaleTimeString("de-DE", {
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-          const dur = formatDuration(s.durationMs || 0);
-          const speed = s.durationMs > 6000 ? ((s.leadsFound / (s.durationMs / 60000)).toFixed(1) + "/min") : "—";
-          const portalSafe = (s.portal || "Unknown").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          return `<div class="history-card">
-            <div class="timeline-dot"></div>
-            <div class="timeline-body">
-              <div class="timeline-top">
-                <span class="history-portal-badge">${portalSafe}</span>
-                <span class="history-leads-count">${s.leadsFound} <span class="history-leads-unit">leads</span></span>
-              </div>
-              <div class="timeline-meta">
-                <span>${timeStr} · ${dateStr}</span>
-                <span class="timeline-pills">
-                  <span class="timeline-pill">${speed}</span>
-                  <span class="timeline-pill">${dur}</span>
-                </span>
-              </div>
-            </div>
-          </div>`;
-        })
-        .join("");
       // Remove old cards, keep the empty message element
       historyList.querySelectorAll(".history-card").forEach((c) => c.remove());
-      historyList.insertAdjacentHTML("beforeend", cards);
+
+      history.forEach((s) => {
+        const date = new Date(s.date);
+        const dateStr = date.toLocaleDateString("de-DE", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+        const timeStr = date.toLocaleTimeString("de-DE", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const dur = formatDuration(s.durationMs || 0);
+        const speed = s.durationMs > 6000 ? ((s.leadsFound / (s.durationMs / 60000)).toFixed(1) + "/min") : "\u2014";
+
+        const card = document.createElement("div");
+        card.className = "history-card";
+
+        const dot = document.createElement("div");
+        dot.className = "timeline-dot";
+
+        const body = document.createElement("div");
+        body.className = "timeline-body";
+
+        const top = document.createElement("div");
+        top.className = "timeline-top";
+        const badge = document.createElement("span");
+        badge.className = "history-portal-badge";
+        badge.textContent = s.portal || "Unknown";
+        const leadsSpan = document.createElement("span");
+        leadsSpan.className = "history-leads-count";
+        leadsSpan.textContent = s.leadsFound + " ";
+        const unitSpan = document.createElement("span");
+        unitSpan.className = "history-leads-unit";
+        unitSpan.textContent = "leads";
+        leadsSpan.appendChild(unitSpan);
+        top.append(badge, leadsSpan);
+
+        const meta = document.createElement("div");
+        meta.className = "timeline-meta";
+        const timeSpan = document.createElement("span");
+        timeSpan.textContent = timeStr + " \u00B7 " + dateStr;
+        const pills = document.createElement("span");
+        pills.className = "timeline-pills";
+        const speedPill = document.createElement("span");
+        speedPill.className = "timeline-pill";
+        speedPill.textContent = speed;
+        const durPill = document.createElement("span");
+        durPill.className = "timeline-pill";
+        durPill.textContent = dur;
+        pills.append(speedPill, durPill);
+        meta.append(timeSpan, pills);
+
+        body.append(top, meta);
+        card.append(dot, body);
+        historyList.appendChild(card);
+      });
     });
   }
 

@@ -279,9 +279,13 @@ async function _startScraping() {
             if (scrapedData.length >= targetLimit) break;
 
             const chunk = hitsArray.slice(i, i + 4);
-            await Promise.all(chunk.map(processHit));
+            // Process sequentially to prevent overshooting targetLimit
+            for (const hit of chunk) {
+                if (!isScraping || isPaused || scrapedData.length >= targetLimit) break;
+                await processHit(hit);
+            }
 
-            // Save data once per chunk instead of 4 times concurrently
+            // Save data once per chunk
             chrome.storage.local.set({ scrapedData });
         }
 

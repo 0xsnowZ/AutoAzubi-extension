@@ -3,9 +3,35 @@
  * Handles fetch proxy for cross-origin requests
  */
 
+// Allowed domains for fetch proxy — prevents misuse as an open proxy
+const ALLOWED_DOMAINS = [
+  "dasoertliche.de",
+  "gelbeseiten.de",
+  "arbeitsagentur.de",
+  "ausbildung.de",
+  "aubi-plus.de",
+  "azubi.de",
+];
+
+function isUrlAllowed(url) {
+  try {
+    const parsed = new URL(url);
+    return ALLOWED_DOMAINS.some(
+      (d) => parsed.hostname === d || parsed.hostname.endsWith("." + d),
+    );
+  } catch {
+    return false;
+  }
+}
+
 // Listen for messages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "fetch_text") {
+    if (!isUrlAllowed(request.url)) {
+      sendResponse({ success: false, error: "URL not in allowed domains" });
+      return;
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
@@ -27,6 +53,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === "fetch_text_utf8") {
+    // For crawlWebsiteForEmail, allow any URL since we're following links from known sites
+    // But still validate it's a proper HTTP(S) URL
+    try {
+      const parsed = new URL(request.url);
+      if (!["http:", "https:"].includes(parsed.protocol)) {
+        sendResponse({ success: false, error: "Invalid protocol" });
+        return;
+      }
+    } catch {
+      sendResponse({ success: false, error: "Invalid URL" });
+      return;
+    }
+
     // UTF-8 fetch for external websites (Impressum, Kontakt pages, etc.)
     // 3-second timeout to avoid blocking on slow/unresponsive sites
     const controller = new AbortController();
