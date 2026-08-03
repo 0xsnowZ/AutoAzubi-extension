@@ -1660,15 +1660,15 @@ button span {
 
 /* ── Dark Theme Overrides ───────────────────────────── */
 body[data-theme="dark"] {
-  --bg: #0e1015;
-  --surface: #16181d;
-  --card: #1c1f26;
-  --card-alt: #2b2f3a;
+  --bg: #131216;
+  --surface: #1a191f;
+  --card: #201f27;
+  --card-alt: #2a2933;
   --border: rgba(255, 255, 255, 0.07);
-  --border-mid: rgba(255, 255, 255, 0.11);
-  --text: #f1f3f9;
-  --text-muted: #64748b;
-  --text-dim: #94a3b8;
+  --border-mid: rgba(255, 255, 255, 0.12);
+  --text: #ededf0;
+  --text-muted: #6e6d78;
+  --text-dim: #9895a3;
   background: var(--bg);
 }
 
