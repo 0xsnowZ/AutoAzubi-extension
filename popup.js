@@ -841,7 +841,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         lastKnownCount = request.count || 0;
         updateEtaMetrics(lastKnownCount);
         if (request.currentTitle) {
-          activityLog.innerText = request.currentTitle;
+          const tempEl = document.createElement("textarea");
+          tempEl.innerHTML = request.currentTitle;
+          activityLog.innerText = tempEl.value;
         }
         // Update progress after animation settles
         setTimeout(updateProgress, 420);
