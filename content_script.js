@@ -51,6 +51,24 @@ function updateStorage() {
     });
 }
 
+/**
+ * Smart element waiter — polls at short intervals and returns as soon as
+ * the element appears, instead of using fixed-length sleep() calls.
+ * @param {string|Function} selector - CSS selector string or a function returning an element
+ * @param {number} timeoutMs - Maximum time to wait before giving up
+ * @param {number} intervalMs - Polling interval
+ * @returns {Promise<Element|null>}
+ */
+async function waitForElement(selector, timeoutMs = 3000, intervalMs = 150) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+        const el = typeof selector === 'function' ? selector() : document.querySelector(selector);
+        if (el) return el;
+        await sleep(intervalMs);
+    }
+    return null;
+}
+
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.settings) {
@@ -176,28 +194,30 @@ async function _startScraping() {
                 const card = cards[i];
                 card.click();
 
-                await sleep(1000);
+                // Smart wait: return as soon as the detail panel or bewerbung button appears
+                await waitForElement(
+                    () => document.getElementById('detailansicht-zur-bewerbung') || document.getElementById('detail-bewerbung-mail'),
+                    2000, 150
+                );
 
                 // Click "Info zur Bewerbung" to request contact details
                 const bewerbungBtn = document.getElementById('detailansicht-zur-bewerbung');
                 if (bewerbungBtn) {
-                    console.log("Clicking 'Info zur Bewerbung'...");
                     bewerbungBtn.click();
-                    await sleep(800);
+                    // Don't use a fixed sleep — fall through to the smart wait below
                 }
 
                 // Handle captcha (appears after requesting contact info)
                 if (await handleCaptcha()) {
-                    // captcha was solved, wait for contact details to load
-                    await sleep(1000);
+                    // captcha was solved, brief wait for contact details to load
+                    await sleep(500);
                 }
 
-                // Wait for contact details to appear (up to 5 seconds)
-                let waitAttempts = 0;
-                while (!document.getElementById('detail-bewerbung-mail') && !document.getElementById('detail-bewerbung-adresse') && waitAttempts < 10) {
-                    await sleep(500);
-                    waitAttempts++;
-                }
+                // Smart wait: poll for contact details to appear (up to 4 seconds)
+                await waitForElement(
+                    () => document.getElementById('detail-bewerbung-mail') || document.getElementById('detail-bewerbung-adresse'),
+                    4000, 200
+                );
 
                 const info = extractInfo();
                 if (info) {
@@ -218,7 +238,7 @@ async function _startScraping() {
                     console.log(`Card ${i}: No email found, skipping.`);
                 }
 
-                await sleep(300);
+                await sleep(150);
                 currentCardIndex = i + 1;
                 updateStorage();
             }
@@ -233,7 +253,7 @@ async function _startScraping() {
         if (loadMoreBtn && isScraping && !isPaused) {
             console.log("Loading more results...");
             loadMoreBtn.click();
-            await sleep(1500);
+            await sleep(1000);
         } else if (!loadMoreBtn) {
             console.log("No more results available.");
             break;

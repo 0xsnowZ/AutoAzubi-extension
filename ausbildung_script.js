@@ -174,8 +174,8 @@ async function runScraping(session) {
         console.error(`[Ausbildung] Error processing ${jobUrl}:`, err);
       }
 
-      // Anti-bot jitter: 400–900ms randomized delay
-      await sleep(Math.floor(Math.random() * 500) + 400);
+      // Anti-bot jitter: 200–450ms randomized delay
+      await sleep(Math.floor(Math.random() * 250) + 200);
     }
 
     if (currentData.length >= limit) break;

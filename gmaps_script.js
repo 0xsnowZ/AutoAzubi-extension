@@ -203,6 +203,18 @@ async function crawlWebsiteForEmail(websiteUrl) {
     return '';
 }
 
+/**
+ * Timeout-guarded wrapper around crawlWebsiteForEmail.
+ * Prevents slow/unresponsive websites from blocking the entire scrape.
+ * Returns '' if the crawl exceeds the time limit.
+ */
+async function crawlWebsiteForEmailWithTimeout(websiteUrl, timeoutMs = 6000) {
+    return Promise.race([
+        crawlWebsiteForEmail(websiteUrl),
+        new Promise(resolve => setTimeout(() => resolve(''), timeoutMs))
+    ]);
+}
+
 async function startScraping() {
     try {
         await _startScraping();
@@ -279,11 +291,11 @@ async function _startScraping() {
             if (scrapedData.length >= targetLimit) break;
 
             const chunk = hitsArray.slice(i, i + 4);
-            // Process sequentially to prevent overshooting targetLimit
-            for (const hit of chunk) {
-                if (!isScraping || isPaused || scrapedData.length >= targetLimit) break;
-                await processHit(hit);
-            }
+            // Process chunk in parallel for speed — overshooting by a few is acceptable
+            await Promise.allSettled(chunk.map(hit => {
+                if (!isScraping || isPaused || scrapedData.length >= targetLimit) return Promise.resolve();
+                return processHit(hit);
+            }));
 
             // Save data once per chunk
             chrome.storage.local.set({ scrapedData });
@@ -350,28 +362,34 @@ async function processHit(hit) {
 
             processedHits++;
             chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, currentTitle: `[DÖ] Checked ${processedHits} hits... Scanning ${company}` });
-            await sleep(Math.random() * 200 + 50); // Jitter to prevent burst rate limits
-            
-            const detailResp = await chrome.runtime.sendMessage({ action: 'fetch_text', url: detailUrl });
-            if (detailResp && detailResp.success) {
-                const rawHtml = detailResp.text;
-                let email = extractEmailFromHtml(rawHtml);
-                
-                if (!email) {
-                    const websiteUrl = extractWebsiteUrl(rawHtml);
-                    if (websiteUrl) {
-                        email = await crawlWebsiteForEmail(websiteUrl);
+            await sleep(Math.random() * 80 + 20); // Reduced jitter for speed
+
+            // Quick check: try to extract email directly from the list-page hit HTML
+            let email = extractEmailFromHtml(hit.innerHTML);
+
+            // If no email on list page, fetch the detail page
+            if (!email) {
+                const detailResp = await chrome.runtime.sendMessage({ action: 'fetch_text', url: detailUrl });
+                if (detailResp && detailResp.success) {
+                    const rawHtml = detailResp.text;
+                    email = extractEmailFromHtml(rawHtml);
+                    
+                    if (!email) {
+                        const websiteUrl = extractWebsiteUrl(rawHtml);
+                        if (websiteUrl) {
+                            email = await crawlWebsiteForEmailWithTimeout(websiteUrl);
+                        }
                     }
                 }
+            }
 
-                if (email) {
-                    // Strict Data Deduplication: Check if email already exists in our dataset
-                    const isDuplicate = scrapedData.some(item => item.email.toLowerCase() === email.toLowerCase());
-                    
-                    if (!isDuplicate && scrapedData.length < targetLimit) {
-                        scrapedData.push({ company, address, phone, email });
-                        chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, currentTitle: `[DÖ] Found email for: ${company}` });
-                    }
+            if (email) {
+                // Strict Data Deduplication: Check if email already exists in our dataset
+                const isDuplicate = scrapedData.some(item => item.email.toLowerCase() === email.toLowerCase());
+                
+                if (!isDuplicate && scrapedData.length < targetLimit) {
+                    scrapedData.push({ company, address, phone, email });
+                    chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, currentTitle: `[DÖ] Found email for: ${company}` });
                 }
             }
         }
