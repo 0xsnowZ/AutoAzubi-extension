@@ -6,25 +6,7 @@ let targetLimit = 50;
 const finishedSound = new Audio(chrome.runtime.getURL('finished.mp3'));
 let settings = { notifyFinish: true };
 
-function waitForElement(selector, timeout = 10000) {
-    return new Promise((resolve) => {
-        if (document.querySelector(selector)) return resolve(document.querySelector(selector));
-
-        const observer = new MutationObserver(() => {
-            if (document.querySelector(selector)) {
-                observer.disconnect();
-                resolve(document.querySelector(selector));
-            }
-        });
-
-        observer.observe(document.body, { childList: true, subtree: true });
-
-        setTimeout(() => {
-            observer.disconnect();
-            resolve(null);
-        }, timeout);
-    });
-}
+// waitForElement() provided by utils.js (MutationObserver-based, loaded first via manifest.json)
 
 async function applyFilters() {
     // Check and wait for the filter dropdown
@@ -97,7 +79,7 @@ async function handleSearchPage(limit = 50) {
                 }
 
                 console.log("Fetching next page: ", nextUrl);
-                const res = await fetch(nextUrl);
+                const res = await fetchWithRetry(nextUrl);
                 const text = await res.text();
                 const parser = new DOMParser();
                 docToSearch = parser.parseFromString(text, 'text/html');
@@ -148,7 +130,7 @@ async function handleSearchPage(limit = 50) {
             const batch = cardUrls.slice(i, i + BATCH_SIZE);
             const results = await Promise.allSettled(batch.map(async (href) => {
                 try {
-                    const response = await fetch(href);
+                    const response = await fetchWithRetry(href);
                     const text = await response.text();
                     const parser = new DOMParser();
                     const doc = parser.parseFromString(text, 'text/html');
@@ -283,62 +265,30 @@ async function countResults() {
     return 0;
 }
 
-// Listen for popup actions
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.settings) {
-        settings = request.settings;
-    }
-
-    if (request.action === 'countResults') {
-        countResults().then(total => sendResponse({ total }));
-        return true;
-    }
-    if (request.action === 'reset') {
-        isScraping = false;
-        isPaused = false;
-        chrome.storage.local.set({ scrapedData: [] }, () => {
-            sendResponse({ status: 'reset' });
-        });
-        return true;
-    }
-    if (request.action === 'start') {
-        const limit = request.limit || 50;
-        if (!isScraping) {
-            handleSearchPage(limit);
+// ─── Message Listener ─────────────────────────────────────────────────────────
+// Uses shared createScraperMessageHandler from utils.js to reduce boilerplate.
+// Default handlers cover: pause, resume, stop, getInitialInfo, getData.
+chrome.runtime.onMessage.addListener(
+    createScraperMessageHandler(
+        () => ({ isScraping, isPaused }),
+        {
+            onSettings: (s) => { settings = s; },
+            onPause: () => { isPaused = true; },
+            onResume: () => { isPaused = false; },
+            onStop: () => { isScraping = false; isPaused = false; },
+            start: (request, sendResponse) => {
+                const limit = request.limit || 50;
+                if (!isScraping) handleSearchPage(limit);
+                sendResponse({ status: 'started' });
+            },
+            reset: (request, sendResponse) => {
+                isScraping = false;
+                isPaused = false;
+                chrome.storage.local.set({ scrapedData: [] }, () => sendResponse({ status: 'reset' }));
+            },
+            countResults: (request, sendResponse) => {
+                countResults().then(total => sendResponse({ total }));
+            },
         }
-        sendResponse({ status: 'started' });
-        return true;
-    }
-    if (request.action === 'pause') {
-        isPaused = true;
-        sendResponse({ status: 'paused' });
-        return true;
-    }
-    if (request.action === 'resume') {
-        isPaused = false;
-        if (isScraping) {
-            // Already inside the loop, just toggled boolean
-        }
-        sendResponse({ status: 'resumed' });
-        return true;
-    }
-    if (request.action === 'stop') {
-        isScraping = false;
-        isPaused = false;
-        sendResponse({ status: 'stopped' });
-        return true;
-    }
-    if (request.action === 'getInitialInfo') {
-        chrome.storage.local.get(['scrapedData'], (res) => {
-            const scount = res.scrapedData ? res.scrapedData.length : 0;
-            sendResponse({ isScraping: isScraping, isPaused: isPaused, scrapedCount: scount });
-        });
-        return true;
-    }
-    if (request.action === 'getData') {
-        chrome.storage.local.get(['scrapedData'], (res) => {
-            sendResponse({ data: res.scrapedData || [] });
-        });
-        return true;
-    }
-});
+    )
+);

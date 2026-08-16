@@ -51,23 +51,7 @@ function updateStorage() {
     });
 }
 
-/**
- * Smart element waiter — polls at short intervals and returns as soon as
- * the element appears, instead of using fixed-length sleep() calls.
- * @param {string|Function} selector - CSS selector string or a function returning an element
- * @param {number} timeoutMs - Maximum time to wait before giving up
- * @param {number} intervalMs - Polling interval
- * @returns {Promise<Element|null>}
- */
-async function waitForElement(selector, timeoutMs = 3000, intervalMs = 150) {
-    const start = Date.now();
-    while (Date.now() - start < timeoutMs) {
-        const el = typeof selector === 'function' ? selector() : document.querySelector(selector);
-        if (el) return el;
-        await sleep(intervalMs);
-    }
-    return null;
-}
+// waitForElement() provided by utils.js (MutationObserver-based, loaded first via manifest.json)
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

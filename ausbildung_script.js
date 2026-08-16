@@ -132,7 +132,7 @@ async function runScraping(session) {
       });
 
       try {
-        const response = await fetch(jobUrl, {
+        const response = await fetchWithRetry(jobUrl, {
           credentials: "include",
           headers: { "Accept": "text/html,application/xhtml+xml" },
         });
@@ -356,57 +356,41 @@ async function countResults() {
 }
 
 // ─── Message Listener ─────────────────────────────────────────────────────────
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.settings) settings = request.settings;
-
-  if (request.action === "countResults") {
-    countResults().then((total) => sendResponse({ total }));
-    return true;
-  }
-  if (request.action === "reset") {
-    isScraping = false;
-    isPaused = false;
-    clearSession();
-    chrome.storage.local.set({ scrapedData: [], isScraping: false, isPaused: false }, () => sendResponse({ status: "reset" }));
-    return true;
-  }
-  if (request.action === "start") {
-    const limit = request.limit || 50;
-    if (!isScraping) handleSearchPage(limit);
-    sendResponse({ status: "started" });
-    return true;
-  }
-  if (request.action === "pause") {
-    isPaused = true;
-    chrome.storage.local.set({ isPaused: true });
-    sendResponse({ status: "paused" });
-    return true;
-  }
-  if (request.action === "resume") {
-    isPaused = false;
-    chrome.storage.local.set({ isPaused: false });
-    sendResponse({ status: "resumed" });
-    return true;
-  }
-  if (request.action === "stop") {
-    isScraping = false;
-    isPaused = false;
-    clearSession();
-    chrome.storage.local.set({ isScraping: false, isPaused: false });
-    sendResponse({ status: "stopped" });
-    return true;
-  }
-  if (request.action === "getInitialInfo") {
-    chrome.storage.local.get(["scrapedData"], (res) => {
-      const scount = res.scrapedData?.length || 0;
-      sendResponse({ isScraping, isPaused, scrapedCount: scount });
-    });
-    return true;
-  }
-  if (request.action === "getData") {
-    chrome.storage.local.get(["scrapedData"], (res) => {
-      sendResponse({ data: res.scrapedData || [] });
-    });
-    return true;
-  }
-});
+// Uses shared createScraperMessageHandler from utils.js to reduce boilerplate.
+// Default handlers cover: pause, resume, getInitialInfo, getData.
+chrome.runtime.onMessage.addListener(
+  createScraperMessageHandler(
+    () => ({ isScraping, isPaused }),
+    {
+      onSettings: (s) => { settings = s; },
+      onPause: () => {
+        isPaused = true;
+        chrome.storage.local.set({ isPaused: true });
+      },
+      onResume: () => {
+        isPaused = false;
+        chrome.storage.local.set({ isPaused: false });
+      },
+      onStop: () => {
+        isScraping = false;
+        isPaused = false;
+        clearSession();
+        chrome.storage.local.set({ isScraping: false, isPaused: false });
+      },
+      start: (request, sendResponse) => {
+        const limit = request.limit || 50;
+        if (!isScraping) handleSearchPage(limit);
+        sendResponse({ status: "started" });
+      },
+      reset: (request, sendResponse) => {
+        isScraping = false;
+        isPaused = false;
+        clearSession();
+        chrome.storage.local.set({ scrapedData: [], isScraping: false, isPaused: false }, () => sendResponse({ status: "reset" }));
+      },
+      countResults: (request, sendResponse) => {
+        countResults().then((total) => sendResponse({ total }));
+      },
+    }
+  )
+);

@@ -272,3 +272,149 @@ function extractPhoneFromHtml(html) {
   if (telMatch) return telMatch[1].trim();
   return "";
 }
+
+// ─── Smart Element Waiter (MutationObserver) ─────────────────────────────────────
+
+/**
+ * Wait for an element to appear in the DOM using MutationObserver.
+ * More efficient than polling — returns as soon as the element appears.
+ * Supports both CSS selector strings and callback functions.
+ *
+ * @param {string|Function} selector - CSS selector or function returning an element
+ * @param {number} timeoutMs - Max time to wait before returning null (default: 5000ms)
+ * @returns {Promise<Element|null>}
+ */
+function waitForElement(selector, timeoutMs = 5000) {
+  return new Promise((resolve) => {
+    const check =
+      typeof selector === "function"
+        ? selector
+        : () => document.querySelector(selector);
+
+    const existing = check();
+    if (existing) return resolve(existing);
+
+    const observer = new MutationObserver(() => {
+      const el = check();
+      if (el) {
+        observer.disconnect();
+        resolve(el);
+      }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    setTimeout(() => {
+      observer.disconnect();
+      resolve(null);
+    }, timeoutMs);
+  });
+}
+
+// ─── Fetch with Retry ────────────────────────────────────────────────────────────
+
+/**
+ * Wrapper around fetch() with automatic retry and linear backoff.
+ * On non-ok responses or network errors, retries up to `retries` times
+ * with increasing delay between attempts.
+ *
+ * @param {string} url - URL to fetch
+ * @param {RequestInit} options - Standard fetch options
+ * @param {number} retries - Number of retry attempts (default: 2)
+ * @param {number} baseDelayMs - Base delay in ms, multiplied by attempt number (default: 1000)
+ * @returns {Promise<Response>}
+ */
+async function fetchWithRetry(url, options = {}, retries = 2, baseDelayMs = 1000) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      if (response.ok || attempt >= retries) return response;
+      console.warn(
+        `[fetchWithRetry] Attempt ${attempt + 1}/${retries + 1} failed (HTTP ${response.status}): ${url}`,
+      );
+    } catch (err) {
+      if (attempt >= retries) throw err;
+      console.warn(
+        `[fetchWithRetry] Attempt ${attempt + 1}/${retries + 1} error: ${err.message}`,
+      );
+    }
+    await sleep(baseDelayMs * (attempt + 1));
+  }
+}
+
+// ─── Shared Message Handler Factory ──────────────────────────────────────────────
+
+/**
+ * Creates a chrome.runtime.onMessage listener with common scraper actions built in.
+ * Scripts provide custom handlers via `callbacks` and the factory handles boilerplate
+ * for pause, resume, stop, getInitialInfo, and getData.
+ *
+ * All handlers automatically return true (async-safe).
+ *
+ * @param {Function} getState - Returns { isScraping, isPaused } from the script's scope
+ * @param {Object} callbacks - Action handlers and lifecycle hooks:
+ *   Custom action handlers (override defaults):
+ *     - start(request, sendResponse)
+ *     - reset(request, sendResponse)
+ *     - countResults(request, sendResponse)
+ *     - getData(request, sendResponse)
+ *     - getInitialInfo(request, sendResponse)
+ *   Lifecycle hooks (called by default handlers):
+ *     - onSettings(settings) — called when settings message arrives
+ *     - onPause()            — called on 'pause' action
+ *     - onResume()           — called on 'resume' action
+ *     - onStop()             — called on 'stop' action
+ * @returns {Function} Listener for chrome.runtime.onMessage.addListener
+ */
+function createScraperMessageHandler(getState, callbacks) {
+  return (request, sender, sendResponse) => {
+    // Settings propagation
+    if (request.settings && callbacks.onSettings) {
+      callbacks.onSettings(request.settings);
+    }
+
+    const action = request.action;
+    if (!action) return;
+
+    // Custom handlers take full priority
+    if (callbacks[action]) {
+      callbacks[action](request, sendResponse);
+      return true;
+    }
+
+    // Default handlers for common actions
+    switch (action) {
+      case "pause":
+        if (callbacks.onPause) callbacks.onPause();
+        sendResponse({ status: "paused" });
+        return true;
+
+      case "resume":
+        if (callbacks.onResume) callbacks.onResume();
+        sendResponse({ status: "resumed" });
+        return true;
+
+      case "stop":
+        if (callbacks.onStop) callbacks.onStop();
+        sendResponse({ status: "stopped" });
+        return true;
+
+      case "getInitialInfo":
+        chrome.storage.local.get(["scrapedData"], (res) => {
+          const state = getState();
+          sendResponse({
+            isScraping: state.isScraping,
+            isPaused: state.isPaused,
+            scrapedCount: res.scrapedData ? res.scrapedData.length : 0,
+          });
+        });
+        return true;
+
+      case "getData":
+        chrome.storage.local.get(["scrapedData"], (res) => {
+          sendResponse({ data: res.scrapedData || [] });
+        });
+        return true;
+    }
+  };
+}

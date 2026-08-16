@@ -9,7 +9,8 @@ let processedHits = 0;        // tracks total hits checked across all pages
 let currentHitStartIndex = 0; // tracks hit index within the current page for pause/resume
 
 // Helper function to wait
-// sleep is provided by utils.js (loaded first via manifest.json)
+// sleep, waitForElement, extractEmailFromHtml, extractPhoneFromHtml
+// are provided by utils.js (loaded first via manifest.json)
 
 const finishedSound = new Audio(chrome.runtime.getURL('finished.mp3'));
 
@@ -281,7 +282,12 @@ async function _startScraping() {
 
         const hitsArray = Array.from(doc.querySelectorAll('.hit'));
         let pausedMidPage = false;
-        for (let i = currentHitStartIndex; i < hitsArray.length; i += 4) {
+
+        // FIX: Cap parallel batch size to remaining capacity to prevent race-condition overshoot.
+        // Previously a fixed chunk of 4 could cause all promises to pass the length check
+        // before any had pushed, allowing slight overshooting of targetLimit.
+        const BATCH_SIZE = 4;
+        for (let i = currentHitStartIndex; i < hitsArray.length; i += BATCH_SIZE) {
             if (!isScraping) break;
             if (isPaused) {
                 currentHitStartIndex = i; // remember exact position for resume
@@ -290,9 +296,12 @@ async function _startScraping() {
             }
             if (scrapedData.length >= targetLimit) break;
 
-            const chunk = hitsArray.slice(i, i + 4);
-            // Process chunk in parallel for speed — overshooting by a few is acceptable
+            // Limit batch to remaining capacity so at most `remaining` promises can push
+            const remaining = targetLimit - scrapedData.length;
+            const chunk = hitsArray.slice(i, i + Math.min(BATCH_SIZE, Math.max(remaining, 1)));
+
             await Promise.allSettled(chunk.map(hit => {
+                // Atomic guard: synchronous check right before processing
                 if (!isScraping || isPaused || scrapedData.length >= targetLimit) return Promise.resolve();
                 return processHit(hit);
             }));
@@ -387,6 +396,7 @@ async function processHit(hit) {
                 // Strict Data Deduplication: Check if email already exists in our dataset
                 const isDuplicate = scrapedData.some(item => item.email.toLowerCase() === email.toLowerCase());
                 
+                // Atomic guard: synchronous check + push with no await in between
                 if (!isDuplicate && scrapedData.length < targetLimit) {
                     scrapedData.push({ company, address, phone, email, source: 'Google Maps', extractedAt: new Date().toISOString() });
                     chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, currentTitle: `[DÖ] Found email for: ${company}` });
@@ -398,74 +408,69 @@ async function processHit(hit) {
     }
 }
 
-// Listener to respond to popup.js requests
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.settings) {
-        settings = request.settings;
-        chrome.storage.local.set(settings);
-    }
-
-    switch (request.action) {
-        case 'start':
-            isScraping = true;
-            isPaused = false;
-            currentPageUrl = null;     // always restart from page 1 on fresh start
-            currentHitStartIndex = 0;  // always restart hit index
-            if (request.reset) {
+// ─── Message Handler ─────────────────────────────────────────────────────────────
+// Uses shared createScraperMessageHandler from utils.js.
+// FIX: All cases now correctly return true (async-safe) via the factory.
+// FIX: countResults no longer has a gratuitous 1.5s setTimeout delay.
+chrome.runtime.onMessage.addListener(
+    createScraperMessageHandler(
+        () => ({ isScraping, isPaused }),
+        {
+            onSettings: (s) => {
+                settings = s;
+                chrome.storage.local.set(s);
+            },
+            onPause: () => { isPaused = true; },
+            onResume: () => { isPaused = false; },
+            start: (request, sendResponse) => {
+                isScraping = true;
+                isPaused = false;
+                currentPageUrl = null;     // always restart from page 1 on fresh start
+                currentHitStartIndex = 0;  // always restart hit index
+                if (request.reset) {
+                    scrapedData = [];
+                    processedHits = 0;
+                }
+                targetLimit = request.limit || 50;
+                startScraping();
+                sendResponse({ status: 'started' });
+            },
+            stop: (request, sendResponse) => {
+                isScraping = false;
+                isPaused = false;
+                currentPageUrl = null;
+                chrome.storage.local.set({ scrapedData });
+                sendResponse({ status: 'stopped' });
+            },
+            reset: (request, sendResponse) => {
+                isScraping = false;
+                isPaused = false;
                 scrapedData = [];
+                currentPageUrl = null;
+                currentHitStartIndex = 0;
                 processedHits = 0;
-            }
-            targetLimit = request.limit || 50;
-            startScraping();
-            sendResponse({ status: 'started' });
-            break;
-        case 'pause':
-            isPaused = true;
-            sendResponse({ status: 'paused' });
-            break;
-        case 'resume':
-            // pause now waits in-place — just unset isPaused, loop continues automatically
-            isPaused = false;
-            sendResponse({ status: 'resumed' });
-            break;
-        case 'stop':
-            isScraping = false;
-            isPaused = false;
-            currentPageUrl = null;
-            chrome.storage.local.set({ scrapedData });
-            sendResponse({ status: 'stopped' });
-            break;
-        case 'reset':
-            isScraping = false;
-            isPaused = false;
-            scrapedData = [];
-            currentPageUrl = null;
-            currentHitStartIndex = 0;
-            processedHits = 0;
-            chrome.storage.local.set({ scrapedData: [] });
-            sendResponse({ status: 'reset' });
-            break;
-        case 'getData':
-            sendResponse({ data: scrapedData });
-            break;
-        case 'getInitialInfo':
-            getDasOertlicheTotal().then(total => {
-                sendResponse({
-                    total: total,
-                    scrapedCount: scrapedData.length,
-                    isScraping,
-                    isPaused
+                chrome.storage.local.set({ scrapedData: [] });
+                sendResponse({ status: 'reset' });
+            },
+            getData: (request, sendResponse) => {
+                sendResponse({ data: scrapedData });
+            },
+            getInitialInfo: (request, sendResponse) => {
+                getDasOertlicheTotal().then(total => {
+                    sendResponse({
+                        total: total,
+                        scrapedCount: scrapedData.length,
+                        isScraping,
+                        isPaused
+                    });
                 });
-            });
-            return true;
-        case 'countResults':
-            getDasOertlicheTotal().then(total => {
-                setTimeout(() => {
+            },
+            countResults: (request, sendResponse) => {
+                // FIX: Removed gratuitous 1.5s setTimeout — respond immediately when data is ready
+                getDasOertlicheTotal().then(total => {
                     sendResponse({ total: total });
-                }, 1500);
-            });
-            return true;
-    }
-    // Return false for synchronous responses and unhandled messages
-    return false;
-});
+                });
+            },
+        }
+    )
+);

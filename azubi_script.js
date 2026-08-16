@@ -103,7 +103,7 @@ async function handleSearchPage(limit = 50) {
       const pageUrl = buildPageUrl(baseUrl, page);
       console.log(`[Azubi] Fetching page ${page}: ${pageUrl}`);
       try {
-        const res = await fetch(pageUrl, { credentials: "include" });
+        const res = await fetchWithRetry(pageUrl, { credentials: "include" });
         if (!res.ok) {
           console.warn("[Azubi] Page fetch failed:", res.status);
           break;
@@ -145,7 +145,7 @@ async function handleSearchPage(limit = 50) {
       processedLinks.add(jobUrl);
 
       try {
-        const response = await fetch(jobUrl, { credentials: "include" });
+        const response = await fetchWithRetry(jobUrl, { credentials: "include" });
         if (!response.ok) {
           console.warn("[Azubi] Fetch failed:", jobUrl, response.status);
           continue;
@@ -266,59 +266,30 @@ async function countResults() {
   return getJobLinksFromPage().length;
 }
 
-// Listen for popup messages
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.settings) {
-    settings = request.settings;
-  }
-
-  if (request.action === "countResults") {
-    countResults().then((total) => sendResponse({ total }));
-    return true;
-  }
-  if (request.action === "reset") {
-    isScraping = false;
-    isPaused = false;
-    chrome.storage.local.set({ scrapedData: [] }, () => {
-      sendResponse({ status: "reset" });
-    });
-    return true;
-  }
-  if (request.action === "start") {
-    const limit = request.limit || 50;
-    if (!isScraping) {
-      handleSearchPage(limit);
+// ─── Message Listener ─────────────────────────────────────────────────────────
+// Uses shared createScraperMessageHandler from utils.js to reduce boilerplate.
+// Default handlers cover: pause, resume, stop, getInitialInfo, getData.
+chrome.runtime.onMessage.addListener(
+  createScraperMessageHandler(
+    () => ({ isScraping, isPaused }),
+    {
+      onSettings: (s) => { settings = s; },
+      onPause: () => { isPaused = true; },
+      onResume: () => { isPaused = false; },
+      onStop: () => { isScraping = false; isPaused = false; },
+      start: (request, sendResponse) => {
+        const limit = request.limit || 50;
+        if (!isScraping) handleSearchPage(limit);
+        sendResponse({ status: "started" });
+      },
+      reset: (request, sendResponse) => {
+        isScraping = false;
+        isPaused = false;
+        chrome.storage.local.set({ scrapedData: [] }, () => sendResponse({ status: "reset" }));
+      },
+      countResults: (request, sendResponse) => {
+        countResults().then((total) => sendResponse({ total }));
+      },
     }
-    sendResponse({ status: "started" });
-    return true;
-  }
-  if (request.action === "pause") {
-    isPaused = true;
-    sendResponse({ status: "paused" });
-    return true;
-  }
-  if (request.action === "resume") {
-    isPaused = false;
-    sendResponse({ status: "resumed" });
-    return true;
-  }
-  if (request.action === "stop") {
-    isScraping = false;
-    isPaused = false;
-    sendResponse({ status: "stopped" });
-    return true;
-  }
-  if (request.action === "getInitialInfo") {
-    chrome.storage.local.get(["scrapedData"], (res) => {
-      const scount = res.scrapedData ? res.scrapedData.length : 0;
-      sendResponse({ isScraping, isPaused, scrapedCount: scount });
-    });
-    return true;
-  }
-  if (request.action === "getData") {
-    chrome.storage.local.get(["scrapedData"], (res) => {
-      sendResponse({ data: res.scrapedData || [] });
-    });
-    return true;
-  }
-});
+  )
+);
