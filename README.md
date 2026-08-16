@@ -1,175 +1,250 @@
-# AutoAzubi Extractor
+<p align="center">
+  <img src="icons/icon128.png" alt="AutoAzubi Logo" width="80" />
+</p>
 
-A Chrome extension that automatically scrapes Ausbildung (apprenticeship) job listings and business contacts from multiple German portals and exports the results as a deduplicated CSV file.
+<h1 align="center">AutoAzubi Extractor</h1>
+
+<p align="center">
+  <strong>Automated Ausbildung lead extraction from Germany's top apprenticeship portals.</strong><br />
+  Scrape job listings, company contacts, and email addresses — then export everything as a clean, deduplicated CSV.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/manifest-v3-blue?style=flat-square" alt="Manifest V3" />
+  <img src="https://img.shields.io/badge/version-1.1-green?style=flat-square" alt="Version 1.1" />
+  <img src="https://img.shields.io/badge/languages-EN%20%7C%20AR-orange?style=flat-square" alt="Languages" />
+  <img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="License" />
+</p>
 
 ---
 
-## Supported Sites
+## ✨ Key Features
 
-| Site                                               | What it scrapes                                                                                     |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| [arbeitsagentur.de](https://www.arbeitsagentur.de) | Job listings with company, email, phone, address, contact person                                    |
-| [ausbildung.de](https://www.ausbildung.de)         | Apprenticeship listings with company, email, address — paginates automatically via `?page=N`        |
-| [aubi-plus.de](https://www.aubi-plus.de)           | Apprenticeship listings with company, email, phone, address                                         |
-| [azubi.de](https://www.azubi.de)                   | Apprenticeship listings with company, email, phone, address — paginates automatically via `?page=N` |
-| [DasÖrtliche.de](https://www.dasoertliche.de)      | Business directory listings with company, email, phone, address (accessed via Google Maps popup)    |
+- **Multi-portal scraping** — Extract from 5 German job & business portals in one extension
+- **Smart email discovery** — 9 regex strategies + Impressum/Kontakt crawling fallback for hard-to-find emails
+- **Automatic pagination** — URL-based pagination for ausbildung.de and azubi.de, no manual clicking required
+- **Deduplication** — Duplicate emails are automatically removed before CSV export
+- **Real-time dashboard** — Progress ring, elapsed time, speed metrics, and ETA
+- **Pause & resume** — Pause mid-scrape and resume from the exact position
+- **Bilingual UI** — Full English and Arabic (RTL) support
+- **Dark mode** — Toggle between light and dark themes
+- **State persistence** — Scraped data is stored in `chrome.storage.local` and survives popup close/reopen
 
 ---
 
-## Installation (Local / Developer Mode)
+## 🌐 Supported Portals
+
+| Portal | Data Extracted | Pagination |
+| --- | --- | --- |
+| [Arbeitsagentur.de](https://www.arbeitsagentur.de) | Company, email, phone, address, contact person, salutation | Manual navigation |
+| [Ausbildung.de](https://www.ausbildung.de) | Company, email, address, listing URL | Automatic (`?page=N`) |
+| [Aubi-Plus.de](https://www.aubi-plus.de) | Company, email, phone, address | Automatic |
+| [Azubi.de](https://www.azubi.de) | Company, email, phone, address, listing URL | Automatic (`?page=N`) |
+| [DasÖrtliche.de](https://www.dasoertliche.de) | Company, email, phone, address, website | Via Google Maps tab |
+
+> **Note:** Ausbildung.de and Azubi.de only collect listings with a publicly visible email address.
+
+---
+
+## 📦 Installation
+
+### Prerequisites
+
+- Google Chrome (or any Chromium-based browser)
+- Developer mode enabled
+
+### Steps
 
 1. Clone or download this repository
-2. Open Chrome and go to `chrome://extensions/`
+2. Open `chrome://extensions/` in your browser
 3. Enable **Developer mode** (top-right toggle)
-4. Click **Load unpacked**
-5. Select the `scrabb extension/` folder
-6. The extension icon will appear in your toolbar
+4. Click **Load unpacked** and select the `autoAzubi/` folder
+5. The AutoAzubi icon will appear in your toolbar — you're ready to go
 
 ---
 
-## How to Use
+## 🚀 Quick Start
 
-### Arbeitsagentur.de
+1. Click the **AutoAzubi** icon in your toolbar
+2. Choose a portal from the **Open Portal** section (or use the **Google Maps** tab for business directory searches)
+3. Navigate to a search results page on the portal
+4. Set your **Extraction Limit** (default: 50)
+5. Click **Start Extraction**
+6. When finished, click **Export Data** to download your CSV
 
-1. Click the extension icon
-2. Click **Open Arbeitsagentur** — it opens the job search page
-3. Navigate to a search results page (Ausbildung listings)
-4. Click **Count** to see how many results are on the page
-5. Set your **Target Number of Offers**
-6. Click **Start Scraping**
-7. If a captcha appears, solve it manually — the scraper will resume automatically
-8. When finished, click **Download CSV Results**
+### Per-Portal Usage
 
-### Ausbildung.de
+<details>
+<summary><strong>Arbeitsagentur.de</strong></summary>
 
-1. Click **Open Ausbildung.de** from the popup
-2. Navigate to a search results page (e.g. search for a job title or location)
-3. Set your **Target Number of Offers**
-4. Click **Start Scraping** — the extension fetches each job detail page in the background and paginates automatically
-5. Download results when done
+1. Click **Arbeitsagentur** to open the job search page
+2. Navigate to an Ausbildung search results page
+3. Click **Count Offers** to see available results
+4. Set your extraction limit and click **Start Extraction**
+5. If a CAPTCHA appears, solve it manually — the scraper resumes automatically
+6. Export your results when complete
 
-> Only listings with a **publicly visible email address** are collected.
+</details>
 
-### Aubi-Plus.de
+<details>
+<summary><strong>Ausbildung.de</strong></summary>
 
-1. Click **Open Aubi-Plus.de** from the popup
+1. Click **Ausbildung.de** to open the portal
+2. Search for a job title, location, or category
+3. Set your extraction limit and click **Start Extraction**
+4. The extension fetches each detail page in the background and paginates automatically
+5. Export your results when complete
+
+</details>
+
+<details>
+<summary><strong>Aubi-Plus.de</strong></summary>
+
+1. Click **Aubi-Plus.de** to open the portal
 2. Navigate to a search results page
-3. Click **Start Scraping** — the extension paginates automatically
-4. Download results when done
+3. Click **Start Extraction** — pagination is handled automatically
+4. Export your results when complete
 
-### Azubi.de
+</details>
 
-1. Click **Open Azubi.de** from the popup — opens `https://www.azubi.de/ausbildungsplatz`
-2. Use the site's search/filter to narrow results (job title, location, etc.)
-3. Set your **Target Number of Offers**
-4. Click **Start Scraping** — the extension fetches each job detail page and paginates automatically
-5. Download results when done
+<details>
+<summary><strong>Azubi.de</strong></summary>
 
-> Only listings with a **publicly visible email address** are collected.
+1. Click **Azubi.de** to open `https://www.azubi.de/ausbildungsplatz`
+2. Use the site's search and filters to narrow results
+3. Set your extraction limit and click **Start Extraction**
+4. The extension fetches each detail page and paginates automatically
+5. Export your results when complete
 
-### Google Maps / DasÖrtliche (Business Directory)
+</details>
 
-1. Click the **Google Maps** tab in the popup
-2. Enter a **Keyword** (business type) and a **City / Location**
-3. Click **Search on Maps** — a DasÖrtliche search opens in a new tab
-4. Go back to the extension popup and click **Start Scraping**
-5. The extension scrapes all matching businesses from DasÖrtliche.de in the background
+<details>
+<summary><strong>Google Maps / DasÖrtliche (Business Directory)</strong></summary>
 
-**Email extraction strategy (multi-step):**
+1. Switch to the **Google Maps** tab in the popup
+2. Enter a **keyword** (industry/business type) and a **city or location**
+3. Click **Search on Google Maps** — a DasÖrtliche search opens in a new tab
+4. Return to the extension popup and click **Start Extraction**
 
-1. Checks DasÖrtliche detail page for email (9 extraction patterns including obfuscated/encoded emails)
-2. If no email found, extracts the company's website URL from the detail page
-3. Crawls the company's `/impressum`, `/kontakt`, and `/imprint` pages (German law requires contact email in Impressum)
+**Multi-step email extraction:**
+
+1. Checks the DasÖrtliche detail page for email (9 extraction patterns including obfuscated and encoded emails)
+2. If no email is found, extracts the company's website URL
+3. Crawls `/impressum`, `/kontakt`, and `/imprint` pages (German law requires contact info in the Impressum)
 4. Only saves businesses where an email was successfully found
 
-**Good keywords for IT/tech apprenticeships:**
+**Suggested search keywords:**
 
-- `Softwareentwicklung`, `IT-Unternehmen`, `EDV`, `Systemhaus`, `Webdesign`
+| Industry | Keywords |
+| --- | --- |
+| IT / Tech | `Softwareentwicklung`, `IT-Unternehmen`, `EDV`, `Systemhaus`, `Webdesign` |
+| SHK / HVAC | `SHK`, `Sanitär`, `Heizungsbau`, `Klempner`, `Haustechnik`, `Installateur` |
 
-**Good keywords for SHK (Sanitär/Heizung/Klima) apprenticeships:**
+> **Tip:** Industries where businesses regularly publish emails (e.g. medical practices, care facilities) yield faster results. The Impressum crawling fallback significantly increases coverage for industries with lower email publication rates.
 
-- `SHK`, `Sanitär`, `Heizungsbau`, `Klempner`, `Haustechnik`, `Installateur`
-
-> Categories where businesses regularly publish emails (e.g. Arzt, Altenheim) will complete faster than categories with low email publication rates (e.g. Softwareentwicklung). The Impressum crawling fallback significantly increases results for the latter.
-
----
-
-## Controls
-
-| Button             | Action                                                      |
-| ------------------ | ----------------------------------------------------------- |
-| **Start Scraping** | Begins extraction up to the target number                   |
-| **Count**          | Counts total available results on the current page          |
-| **Reset**          | Clears all collected data (with confirmation dialog)        |
-| **Pause**          | Pauses after the current item (resumes from exact position) |
-| **Resume**         | Continues from where it paused                              |
-| **Stop**           | Stops scraping and keeps collected data                     |
-| **Download CSV**   | Exports all scraped data as a deduplicated `.csv` file      |
+</details>
 
 ---
 
-## CSV Output Format
+## 🎮 Controls
 
-The exported file is named `scraped_jobs_YYYY-MM-DD.csv` with the following columns:
-
-| A            | B     | C       | D               | E      | F       | G         |
-| ------------ | ----- | ------- | --------------- | ------ | ------- | --------- |
-| Company Name | Email | Address | Ansprechpartner | Anrede | Website | Telephone |
-
-**Notes:**
-
-- The CSV is **automatically deduplicated** before export — duplicate emails are removed, keeping only the first occurrence
-- `Ansprechpartner` and `Anrede` are only populated for Arbeitsagentur listings
-- `Website` column contains the job listing URL for ausbildung.de / azubi.de entries
-- `Telephone` is populated for DasÖrtliche and aubi-plus.de entries
+| Control | Description |
+| --- | --- |
+| **Start Extraction** | Begin scraping up to the configured extraction limit |
+| **Count Offers** | Count total available results on the current page |
+| **Pause** | Pause after the current item — resume from the exact position |
+| **Resume** | Continue scraping from where it was paused |
+| **Stop** | Stop scraping and keep all collected data |
+| **Reset** | Clear all collected data (with confirmation dialog) |
+| **Export Data** | Download all scraped data as a deduplicated `.csv` file |
 
 ---
 
-## Settings
+## 📄 CSV Output
 
-- **Captcha Sound** — plays an audio alert every 4 seconds when a captcha is detected on Arbeitsagentur
-- **Finish Sound** — plays an audio alert when scraping completes
+Exported files are named `autoazubi_leads_YYYY-MM-DD.csv` with the following schema:
+
+| Column | Field | Source |
+| --- | --- | --- |
+| A | Company Name | All portals |
+| B | Email | All portals |
+| C | Street | All portals |
+| D | PLZ | All portals |
+| E | City | All portals |
+| F | Ansprechpartner | Arbeitsagentur only |
+| G | Greeting | Arbeitsagentur only |
+| H | Website / Listing URL | DasÖrtliche, Ausbildung.de, Azubi.de |
+| I | Telephone | DasÖrtliche, Aubi-Plus.de |
+| J | Source Portal | All portals |
+| K | Extracted Date | All portals |
+
+**Deduplication rules:**
+- Entries with email → deduplicated by email (case-insensitive)
+- Entries without email → deduplicated by company name + address
 
 ---
 
-## Languages
+## ⚙️ Settings
 
-The popup UI supports **English** and **Arabic (RTL)** — toggle with the EN / عربي buttons at the top of the popup.
+| Setting | Description |
+| --- | --- |
+| **Captcha Sound** | Plays an audio alert every 4 seconds when a CAPTCHA is detected on Arbeitsagentur |
+| **Finish Sound** | Plays an audio alert when scraping completes |
 
 ---
 
-## File Structure
+## 🌍 Localization
+
+The popup UI supports **English** and **Arabic (RTL)**. Toggle between languages using the **EN** / **عربي** buttons in the header.
+
+---
+
+## 🗂️ Project Structure
 
 ```
-scrabb extension/
-├── manifest.json           # Extension manifest (MV3)
-├── popup.html              # Popup UI
-├── popup.js                # Popup logic, i18n, CSV export (with deduplication)
-├── styles.css              # Popup styles
-├── background.js           # Service worker (ISO-8859-1 fetch proxy for DasÖrtliche + UTF-8 fetch proxy for external websites)
-├── content_script.js       # Scraper for arbeitsagentur.de
-├── ausbildung_script.js    # Scraper for ausbildung.de (URL-based pagination)
-├── aubiplus_script.js      # Scraper for aubi-plus.de
-├── azubi_script.js         # Scraper for azubi.de (URL-based pagination)
-├── gmaps_script.js         # Scraper for DasÖrtliche.de with Impressum/Kontakt crawling fallback
-├── captcha.mp3             # Captcha alert sound
-├── finished.mp3            # Completion sound
+autoAzubi/
+├── manifest.json             # Chrome extension manifest (MV3)
+├── popup.html                # Popup UI layout
+├── popup.js                  # Popup logic, i18n, state management, CSV export
+├── styles.css                # UI styles (light/dark themes)
+├── background.js             # Service worker — fetch proxies for ISO-8859-1 & UTF-8 encoding
+├── utils.js                  # Shared utility functions
+├── content_script.js         # Scraper: arbeitsagentur.de
+├── ausbildung_script.js      # Scraper: ausbildung.de (URL-based pagination)
+├── aubiplus_script.js        # Scraper: aubi-plus.de
+├── azubi_script.js           # Scraper: azubi.de (URL-based pagination)
+├── gmaps_script.js           # Scraper: DasÖrtliche.de + Impressum/Kontakt fallback
+├── captcha.mp3               # CAPTCHA detection alert sound
+├── finished.mp3              # Scraping completion sound
 └── icons/
-    ├── icon16.png
-    ├── icon48.png
-    └── icon128.png
+    ├── icon16.png            # Toolbar icon (16×16)
+    ├── icon48.png            # Extension management icon (48×48)
+    ├── icon128.png           # Chrome Web Store icon (128×128)
+    └── gmaps-hero.jpg        # Google Maps tab hero banner
 ```
 
 ---
 
-## Technical Notes
+## 🔧 Technical Details
 
-- **Pagination**: ausbildung.de and azubi.de use URL-based pagination (`?page=N`) — the scraper fetches pages directly via `fetch()` with session cookies, no DOM clicking required
-- **Email extraction**: Uses 9 regex strategies on raw HTML to handle plain, obfuscated (`[at]`, `(dot)`), entity-encoded, `data-email`, and `onclick`-embedded emails. Avoids `DOMParser` resolving `mailto:` links to `chrome-extension://` URLs
-- **Impressum crawling**: When no email is found on DasÖrtliche, the scraper extracts the company's website URL and fetches `/impressum`, `/kontakt`, and `/imprint` pages with a 5-second timeout per request
-- **Address extraction**: Uses JSON-LD structured data (`application/ld+json`) as primary source, with DOM selector fallbacks
-- **Deduplication**: CSV export deduplicates by email (case-insensitive); entries without email are deduplicated by company+address
-- **Request delays**: 100ms between detail page fetches, 200ms between list pages — network round-trip provides natural throttling for website crawling
-- **Fetch timeout**: External website fetches abort after 5 seconds to avoid blocking on slow/unresponsive sites
-- **State persistence**: Scraped data is stored in `chrome.storage.local` — data survives popup close/reopen
-- **DasÖrtliche encoding**: Scraping runs via the service worker fetch proxy (required for ISO-8859-1 encoding support); external website crawling uses a separate UTF-8 fetch proxy
+<details>
+<summary><strong>Architecture & Implementation Notes</strong></summary>
+
+| Area | Details |
+| --- | --- |
+| **Pagination** | Ausbildung.de and Azubi.de use URL-based pagination (`?page=N`) — pages are fetched directly via `fetch()` with session cookies, no DOM interaction required |
+| **Email extraction** | 9 regex strategies on raw HTML: plain text, obfuscated (`[at]`, `(dot)`), entity-encoded, `data-email` attributes, and `onclick`-embedded patterns. Avoids `DOMParser` to prevent `mailto:` links resolving to `chrome-extension://` URLs |
+| **Impressum crawling** | When no email is found on DasÖrtliche, the scraper extracts the company's website URL and fetches `/impressum`, `/kontakt`, and `/imprint` pages with a 5-second timeout per request |
+| **Address extraction** | Uses JSON-LD structured data (`application/ld+json`) as primary source, with DOM selector fallbacks |
+| **Request throttling** | 100 ms between detail page fetches, 200 ms between list pages — network round-trip provides additional natural throttling |
+| **Fetch timeout** | External website fetches abort after 5 seconds to prevent blocking on slow or unresponsive sites |
+| **State persistence** | All scraped data is stored in `chrome.storage.local` — data persists across popup close/reopen cycles |
+| **Encoding support** | DasÖrtliche scraping runs via the service worker fetch proxy (required for ISO-8859-1 encoding); external website crawling uses a separate UTF-8 fetch proxy |
+
+</details>
+
+---
+
+<p align="center">
+  Built with ❤️ for the German apprenticeship market
+</p>

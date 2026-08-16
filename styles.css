@@ -1181,7 +1181,7 @@ details.settings-section[open] summary .chevron {
 .gmaps-hero-bg {
   position: absolute;
   inset: 0;
-  background-image: url('icons/images (1).jpeg');
+  background-image: url('icons/gmaps-hero.jpg');
   background-size: cover;
   background-position: center 38%;
   transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);

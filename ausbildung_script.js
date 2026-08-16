@@ -159,7 +159,7 @@ async function runScraping(session) {
         const company = extractCompanyFromDoc(doc);
         const address = extractAddressFromDoc(doc);
 
-        currentData.push({ company, email, address, contact: "", anrede: "", link: jobUrl, phone: "" });
+        currentData.push({ company, email, address, contact: "", anrede: "", link: jobUrl, phone: "", source: "Ausbildung.de", extractedAt: new Date().toISOString() });
 
         // Persist to storage immediately so no data is lost on crash/stop
         await new Promise((r) => chrome.storage.local.set({ scrapedData: currentData }, r));

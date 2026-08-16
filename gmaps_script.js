@@ -388,7 +388,7 @@ async function processHit(hit) {
                 const isDuplicate = scrapedData.some(item => item.email.toLowerCase() === email.toLowerCase());
                 
                 if (!isDuplicate && scrapedData.length < targetLimit) {
-                    scrapedData.push({ company, address, phone, email });
+                    scrapedData.push({ company, address, phone, email, source: 'DasÖrtliche', extractedAt: new Date().toISOString() });
                     chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, currentTitle: `[DÖ] Found email for: ${company}` });
                 }
             }

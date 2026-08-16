@@ -470,8 +470,20 @@ function extractInfo() {
         const html = addressParent.innerHTML;
         const lines = html.split(/<br\s*\/?>/i).map(l => l.trim().replace(/<.*?>/g, ''));
         company = lines[0] || '';
-        contact = lines[1] || '';
-        address = lines.slice(2).join(', ');
+
+        // Heuristic: if lines[1] looks like a street address (contains a digit
+        // followed by common German street suffixes), treat it as part of the
+        // address rather than a contact person name.
+        const streetPattern = /\d/.test(lines[1] || '') &&
+            /(?:str|stra|straße|weg|platz|allee|ring|damm|gasse|hof|markt)/i.test(lines[1] || '');
+
+        if (streetPattern) {
+            contact = '';
+            address = lines.slice(1).join(', ');
+        } else {
+            contact = lines[1] || '';
+            address = lines.slice(2).join(', ');
+        }
     }
 
     // If no email found in regular field, search in description using shared utils
@@ -481,7 +493,7 @@ function extractInfo() {
 
     // Return object if we found email (already enforced above, but returning consistent object)
     if (email) {
-        return { company, contact, address, email, phone };
+        return { company, contact, address, email, phone, source: 'Arbeitsagentur', extractedAt: new Date().toISOString() };
     }
 
     return null;

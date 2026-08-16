@@ -184,7 +184,9 @@ async function handleSearchPage(limit = 50) {
                         contact: '',
                         anrede: '',
                         link: href,
-                        phone: phone
+                        phone: phone,
+                        source: 'Aubi-Plus.de',
+                        extractedAt: new Date().toISOString()
                     });
 
                     await new Promise(r => chrome.storage.local.set({ scrapedData: currentData }, r));

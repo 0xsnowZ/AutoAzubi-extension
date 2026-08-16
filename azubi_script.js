@@ -182,6 +182,8 @@ async function handleSearchPage(limit = 50) {
           anrede: "",
           link: jobUrl,
           phone,
+          source: "Azubi.de",
+          extractedAt: new Date().toISOString(),
         });
 
         await new Promise((r) =>

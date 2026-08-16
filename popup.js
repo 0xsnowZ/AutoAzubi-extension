@@ -889,12 +889,39 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   function downloadCSV(data) {
+    // ── Helper: decode HTML entities (e.g. &amp; → &) ──
+    const decodeEl = document.createElement("textarea");
+    function decodeEntities(str) {
+      decodeEl.innerHTML = str;
+      return decodeEl.value;
+    }
+
+    // ── Helper: split German address into Street / PLZ / City ──
+    function splitAddress(raw) {
+      const addr = (raw || "").trim();
+      // Match: "Street Part, 12345 City Name" or "Street Part, 12345 City, Region"
+      const match = addr.match(/^(.+?),\s*(\d{5})\s+(.+)$/);
+      if (match) {
+        return { street: match[1].trim(), plz: match[2], city: match[3].trim() };
+      }
+      // Match: "12345 City" (no street, only PLZ+City)
+      const plzOnly = addr.match(/^(\d{5})\s+(.+)$/);
+      if (plzOnly) {
+        return { street: "", plz: plzOnly[1], city: plzOnly[2].trim() };
+      }
+      return { street: addr, plz: "", city: "" };
+    }
+
     // Deduplicate before export:
     // - rows with email: deduplicate by email (case-insensitive)
     // - rows without email: deduplicate by company+address
     const seenEmails = new Set();
     const seenCompanyAddr = new Set();
     data = data.filter((row) => {
+      // Skip rows with empty company name
+      const company = (row.company || "").trim();
+      if (!company) return false;
+
       const email = (row.email || "").trim().toLowerCase();
       if (email) {
         if (seenEmails.has(email)) return false;
@@ -902,7 +929,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         return true;
       }
       // No email — deduplicate by company+address
-      const key = `${(row.company || "").trim().toLowerCase()}|${(row.address || "").trim().toLowerCase()}`;
+      const key = `${company.toLowerCase()}|${(row.address || "").trim().toLowerCase()}`;
       if (seenCompanyAddr.has(key)) return false;
       seenCompanyAddr.add(key);
       return true;
@@ -911,28 +938,38 @@ document.addEventListener("DOMContentLoaded", async () => {
     const headers = [
       "Company Name",
       "Email",
-      "Address",
+      "Street",
+      "PLZ",
+      "City",
       "Ansprechpartner",
-      "Anrede",
+      "Greeting",
       "Website",
       "Telephone",
+      "Source Portal",
+      "Extracted Date",
     ];
     const csvContent = [
       headers.join(","),
       ...data.map((row) => {
-        const contact = row.contact || "";
+        const contact = decodeEntities(row.contact || "");
         const firstWord = contact.trim().split(" ")[0] || "";
         const validTitles = ["Herr", "Frau", "Dr.", "Prof.", "Herrn"];
         const anrede = validTitles.includes(firstWord) ? firstWord : "";
 
+        const addr = splitAddress(decodeEntities(row.address || ""));
+
         const values = [
-          row.company || "",
+          decodeEntities(row.company || ""),
           row.email || "",
-          row.address || "",
+          addr.street,
+          addr.plz,
+          addr.city,
           contact,
           anrede,
           row.link || "",
           row.phone || "",
+          row.source || "",
+          row.extractedAt || "",
         ];
         return values
           .map((v) => `"${String(v).replace(/"/g, '""')}"`)
