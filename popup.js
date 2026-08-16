@@ -742,7 +742,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       sendMessageToTab({ action: "reset" }, (response) => {
         if (response && response.status === "reset") {
           countDisplay.innerText = "0";
-          totalDisplay.innerText = "?";
+          totalDisplay.innerText = "\u2014";
           downloadBtn.disabled = true;
           updateProgress();
           updateUI("idle");
@@ -899,10 +899,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     // ── Helper: split German address into Street / PLZ / City ──
     function splitAddress(raw) {
       const addr = (raw || "").trim();
+      // Match: "Street Part, 12345, City Name" (three comma-separated — Aubi-Plus JSON-LD format)
+      const threePartMatch = addr.match(/^(.+?),\s*(\d{5}),\s*(.+)$/);
+      if (threePartMatch) {
+        return { street: threePartMatch[1].trim(), plz: threePartMatch[2], city: threePartMatch[3].trim() };
+      }
       // Match: "Street Part, 12345 City Name" or "Street Part, 12345 City, Region"
       const match = addr.match(/^(.+?),\s*(\d{5})\s+(.+)$/);
       if (match) {
         return { street: match[1].trim(), plz: match[2], city: match[3].trim() };
+      }
+      // Match: "Street Part 12345 City" (no comma — DasÖrtliche format)
+      const noComma = addr.match(/^(.+?)\s+(\d{5})\s+(.+)$/);
+      if (noComma) {
+        return { street: noComma[1].trim(), plz: noComma[2], city: noComma[3].trim() };
       }
       // Match: "12345 City" (no street, only PLZ+City)
       const plzOnly = addr.match(/^(\d{5})\s+(.+)$/);
@@ -910,6 +920,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         return { street: "", plz: plzOnly[1], city: plzOnly[2].trim() };
       }
       return { street: addr, plz: "", city: "" };
+    }
+
+    // ── Helper: clean phone number ──
+    function cleanPhone(raw) {
+      return (raw || "")
+        .replace(/^Tel\.\s*/i, "")
+        .replace(/\s*Gratis anrufen!?\s*$/i, "")
+        .trim();
     }
 
     // Deduplicate before export:
@@ -942,7 +960,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       "PLZ",
       "City",
       "Ansprechpartner",
-      "Greeting",
       "Website",
       "Telephone",
       "Source Portal",
@@ -952,9 +969,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       headers.join(","),
       ...data.map((row) => {
         const contact = decodeEntities(row.contact || "");
-        const firstWord = contact.trim().split(" ")[0] || "";
-        const validTitles = ["Herr", "Frau", "Dr.", "Prof.", "Herrn"];
-        const anrede = validTitles.includes(firstWord) ? firstWord : "";
 
         const addr = splitAddress(decodeEntities(row.address || ""));
 
@@ -965,9 +979,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           addr.plz,
           addr.city,
           contact,
-          anrede,
           row.link || "",
-          row.phone || "",
+          cleanPhone(row.phone),
           row.source || "",
           row.extractedAt || "",
         ];

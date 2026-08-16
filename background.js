@@ -35,12 +35,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-    // DasÖrtliche uses ISO-8859-1 encoding
+    // Auto-detect encoding from Content-Type header, fallback to UTF-8
     fetch(request.url, { signal: controller.signal })
       .then((res) => {
         clearTimeout(timeoutId);
+        const contentType = res.headers.get('content-type') || '';
+        const charsetMatch = contentType.match(/charset=([\w-]+)/i);
+        const charset = charsetMatch ? charsetMatch[1] : 'utf-8';
         return res.arrayBuffer().then((buffer) => {
-          const decoder = new TextDecoder("iso-8859-1");
+          const decoder = new TextDecoder(charset);
           return decoder.decode(buffer);
         });
       })

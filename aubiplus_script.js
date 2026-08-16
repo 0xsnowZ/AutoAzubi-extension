@@ -113,16 +113,9 @@ async function handleSearchPage(limit = 50) {
             break; // No more cards found on this page
         }
 
+        // Collect all card URLs first, then process in parallel batches
+        const cardUrls = [];
         for (let i = 0; i < cards.length; i++) {
-            while (isPaused) {
-                await new Promise(r => setTimeout(r, 500));
-                if (!isScraping) break;
-            }
-            if (!isScraping) break;
-
-            if (currentData.length >= limit) break;
-
-            // Look for the actual job link, not the "merkzettel" heart icon which has href="#"
             let linkElement = cards[i].querySelector('a.stretched-link') || cards[i].querySelector('h2 a') || cards[i].querySelector('a:not([href="#"])');
             if (cards[i].tagName === 'A') linkElement = cards[i];
             if (!linkElement) continue;
@@ -137,67 +130,116 @@ async function handleSearchPage(limit = 50) {
                 href = 'https://www.aubi-plus.de' + href;
             }
 
-            // Skip duplicate URLs
-            if (seenUrls.has(href)) continue;
+            if (!seenUrls.has(href)) {
+                cardUrls.push(href);
+            }
+        }
 
-            try {
-                const response = await fetch(href);
-                const text = await response.text();
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(text, 'text/html');
+        // Process in parallel batches of 5 for ~5x speed improvement
+        const BATCH_SIZE = 5;
+        for (let i = 0; i < cardUrls.length; i += BATCH_SIZE) {
+            while (isPaused) {
+                await new Promise(r => setTimeout(r, 500));
+                if (!isScraping) break;
+            }
+            if (!isScraping) break;
+            if (currentData.length >= limit) break;
 
-                // Use shared utils.js functions (resilient to site template changes)
-                const companyName = extractCompanyFromDoc(doc) ||
-                    (() => {
-                        // Aubi-Plus-specific fallback
-                        const el = doc.querySelector('.fs-6.mb-0.lh-1');
-                        return el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
-                    })();
+            const batch = cardUrls.slice(i, i + BATCH_SIZE);
+            const results = await Promise.allSettled(batch.map(async (href) => {
+                try {
+                    const response = await fetch(href);
+                    const text = await response.text();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(text, 'text/html');
 
-                const address = extractAddressFromDoc(doc) ||
-                    (() => {
-                        // Aubi-Plus-specific fallback: icon neighbor
-                        const icons = doc.querySelectorAll('.fa-location-dot');
-                        for (let icon of icons) {
-                            if (icon.nextElementSibling && icon.nextElementSibling.tagName === 'SPAN') {
-                                return icon.nextElementSibling.textContent.trim();
-                            }
+                    // Aubi-Plus encodes script type as "application&#x2F;ld&#x2B;json"
+                    // which breaks querySelector, so extract hiringOrganization.name via regex
+                    const companyName = (() => {
+                        const orgMatch = text.match(/"hiringOrganization"\s*:\s*\{[^}]*"name"\s*:\s*"([^"]+)"/);
+                        if (orgMatch) return orgMatch[1].replace(/\\u[\da-fA-F]{4}/g, m => String.fromCharCode(parseInt(m.slice(2), 16)));
+                        return extractCompanyFromDoc(doc);
+                    })() ||
+                        (() => {
+                            const el = doc.querySelector('.fs-6.mb-0.lh-1');
+                            return el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
+                        })();
+
+                    const address = (() => {
+                        // Regex extraction from JSON-LD (same encoding issue as company)
+                        const street = (text.match(/"streetAddress"\s*:\s*"([^"]+)"/) || [])[1] || '';
+                        const postal = (text.match(/"postalCode"\s*:\s*"([^"]+)"/) || [])[1] || '';
+                        const locality = (text.match(/"addressLocality"\s*:\s*"([^"]+)"/) || [])[1] || '';
+                        if (street || postal || locality) {
+                            const decoded = [street, postal, locality].filter(Boolean).join(', ')
+                                .replace(/\\u[\da-fA-F]{4}/g, m => String.fromCharCode(parseInt(m.slice(2), 16)));
+                            return decoded;
                         }
+                        return extractAddressFromDoc(doc);
+                    })() ||
+                        (() => {
+                            const icons = doc.querySelectorAll('.fa-location-dot');
+                            for (let icon of icons) {
+                                if (icon.nextElementSibling && icon.nextElementSibling.tagName === 'SPAN') {
+                                    return icon.nextElementSibling.textContent.trim();
+                                }
+                            }
+                            return '';
+                        })();
+
+                    const email = extractEmailFromHtml(text);
+                    const phone = (() => {
+                            const el = doc.querySelector('.phoneNumber');
+                            return el ? el.textContent.trim() : '';
+                        })() || extractPhoneFromHtml(text);
+
+                    // Extract Ansprechpartner: "Frau Claudia Pelka" in <strong> near mail-protect
+                    const contact = (() => {
+                        const contactMatch = text.match(/<strong>\s*((?:Frau|Herr)\s+[^<]+?)\s*<\/strong>/i);
+                        if (contactMatch) return contactMatch[1].trim();
+                        // Fallback: alt attribute of ansprechpartner image
+                        const altMatch = text.match(/ansprechpartner[^>]*alt="([^"]+)"/i);
+                        if (altMatch) return altMatch[1].trim();
                         return '';
                     })();
 
-                const email = extractEmailFromHtml(text);
-                const phone = extractPhoneFromHtml(text) ||
-                    (() => {
-                        const el = doc.querySelector('.phoneNumber');
-                        return el ? el.textContent.trim() : '';
-                    })();
+                    return { href, companyName, address, email, phone, contact };
+                } catch (err) {
+                    console.error("Error fetching details", err);
+                    return null;
+                }
+            }));
 
-                if (!email) continue; // Skip if no email found
+            // Process batch results
+            for (const result of results) {
+                if (result.status !== 'fulfilled' || !result.value) continue;
+                if (currentData.length >= limit) break;
 
-                if (companyName || email || address || phone) {
-                    seenUrls.add(href);
-                    currentData.push({
-                        company: companyName,
-                        email: email,
-                        address: address,
-                        contact: '',
-                        anrede: '',
-                        link: href,
-                        phone: phone,
-                        source: 'Aubi-Plus.de',
-                        extractedAt: new Date().toISOString()
-                    });
+                const { href, companyName, address, email, phone, contact } = result.value;
 
-                    await new Promise(r => chrome.storage.local.set({ scrapedData: currentData }, r));
-                    chrome.runtime.sendMessage({ action: 'progress', count: currentData.length, currentTitle: companyName });
+                if (!email) {
+                    chrome.runtime.sendMessage({ action: 'progress', count: currentData.length, currentTitle: `[Aubi-Plus] Checking: ${companyName || 'Unknown'} (no email)` });
+                    continue;
                 }
 
-            } catch (err) {
-                console.error("Error fetching details", err);
+                seenUrls.add(href);
+                currentData.push({
+                    company: companyName,
+                    email: email,
+                    address: address,
+                    contact: contact || '',
+                    anrede: '',
+                    link: href,
+                    phone: phone,
+                    source: 'Aubi-Plus.de',
+                    extractedAt: new Date().toISOString()
+                });
+
+                chrome.runtime.sendMessage({ action: 'progress', count: currentData.length, currentTitle: companyName });
             }
 
-            await new Promise(r => setTimeout(r, 300));
+            // Save once per batch instead of per-item
+            await new Promise(r => chrome.storage.local.set({ scrapedData: currentData }, r));
         }
 
         currentPage++;

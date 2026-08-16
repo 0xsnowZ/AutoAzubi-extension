@@ -172,11 +172,10 @@ Exported files are named `autoazubi_leads_YYYY-MM-DD.csv` with the following sch
 | D | PLZ | All portals |
 | E | City | All portals |
 | F | Ansprechpartner | Arbeitsagentur only |
-| G | Greeting | Arbeitsagentur only |
-| H | Website / Listing URL | DasÖrtliche, Ausbildung.de, Azubi.de |
-| I | Telephone | DasÖrtliche, Aubi-Plus.de |
-| J | Source Portal | All portals |
-| K | Extracted Date | All portals |
+| G | Website / Listing URL | DasÖrtliche, Ausbildung.de, Azubi.de |
+| H | Telephone | DasÖrtliche, Aubi-Plus.de |
+| I | Source Portal | All portals |
+| J | Extracted Date | All portals |
 
 **Deduplication rules:**
 - Entries with email → deduplicated by email (case-insensitive)

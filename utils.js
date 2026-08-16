@@ -44,6 +44,8 @@ function extractEmailFromHtml(rawHtml) {
       rawHtml.match(/data-mail="([^"]+)"/i);
     if (dataEmail) {
       email = dataEmail[1].trim();
+      // Aubi-Plus obfuscation: "l###i###a###@###e###x###.###d###e"
+      email = email.replace(/###/g, "");
       email = email
         .replace(/\(at\)/gi, "@")
         .replace(/\[at\]/gi, "@")
