@@ -1,5 +1,8 @@
 console.log("GMaps script injected for DasÖrtliche scraping overlay");
 
+const PORTAL_SOURCE = 'Google Maps';
+const GMAPS_SESSION_KEY = 'gmapsScrapingSession';
+
 let isScraping = false;
 let isPaused = false;
 let scrapedData = [];
@@ -9,7 +12,7 @@ let processedHits = 0;        // tracks total hits checked across all pages
 let currentHitStartIndex = 0; // tracks hit index within the current page for pause/resume
 
 // Helper function to wait
-// sleep, waitForElement, extractEmailFromHtml, extractPhoneFromHtml
+// sleep, sleepWithThrottle, waitForElement, extractEmailFromHtml, extractPhoneFromHtml
 // are provided by utils.js (loaded first via manifest.json)
 
 const finishedSound = new Audio(chrome.runtime.getURL('finished.mp3'));
@@ -19,6 +22,48 @@ let settings = {
     notifyCaptcha: true,
     notifyFinish: true
 };
+
+// ─── Session Persistence ─────────────────────────────────────────────────────────
+
+function saveGmapsSession() {
+    chrome.storage.local.set({
+        scrapedData,
+        [GMAPS_SESSION_KEY]: {
+            currentPageUrl,
+            currentHitStartIndex,
+            processedHits,
+            targetLimit,
+            isScraping,
+            isPaused
+        }
+    });
+}
+
+function clearGmapsSession() {
+    chrome.storage.local.remove(GMAPS_SESSION_KEY);
+}
+
+// Initialize State from Storage — auto-resume if a session was active
+chrome.storage.local.get(['scrapedData', GMAPS_SESSION_KEY, 'notifyCaptcha', 'notifyFinish'], (result) => {
+    if (result.scrapedData) scrapedData = result.scrapedData;
+    settings.notifyCaptcha = result.notifyCaptcha !== false;
+    settings.notifyFinish = result.notifyFinish !== false;
+
+    const session = result[GMAPS_SESSION_KEY];
+    if (session) {
+        currentPageUrl = session.currentPageUrl;
+        currentHitStartIndex = session.currentHitStartIndex || 0;
+        processedHits = session.processedHits || 0;
+        targetLimit = session.targetLimit || 50;
+        isScraping = session.isScraping || false;
+        isPaused = session.isPaused || false;
+
+        if (isScraping && !isPaused) {
+            console.log(`[GMaps] Auto-resuming session: ${scrapedData.filter(d => d.source === PORTAL_SOURCE).length} portal entries, page ${currentPageUrl}`);
+            startScraping();
+        }
+    }
+});
 
 function extractKwAndCity() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -223,7 +268,7 @@ async function startScraping() {
         console.error('[GMaps] Scraping error:', err);
         isScraping = false;
         isPaused = false;
-        chrome.storage.local.set({ isScraping: false, isPaused: false });
+        clearGmapsSession();
         chrome.runtime.sendMessage({ action: 'error', message: String(err) });
     }
 }
@@ -252,7 +297,9 @@ async function _startScraping() {
         currentPageUrl = `https://www.dasoertliche.de/?kw=${encodeURIComponent(keyword)}&ci=${encodeURIComponent(city)}&form_name=search_nat`;
     }
 
-    while (currentPageUrl && isScraping && scrapedData.length < targetLimit) {
+    let portalCount = scrapedData.filter(d => d.source === PORTAL_SOURCE).length;
+
+    while (currentPageUrl && isScraping && portalCount < targetLimit) {
         while (isPaused) {
             await sleep(300);
             if (!isScraping) break;
@@ -283,41 +330,43 @@ async function _startScraping() {
         const hitsArray = Array.from(doc.querySelectorAll('.hit'));
         let pausedMidPage = false;
 
-        // FIX: Cap parallel batch size to remaining capacity to prevent race-condition overshoot.
-        // Previously a fixed chunk of 4 could cause all promises to pass the length check
-        // before any had pushed, allowing slight overshooting of targetLimit.
         const BATCH_SIZE = 4;
         for (let i = currentHitStartIndex; i < hitsArray.length; i += BATCH_SIZE) {
             if (!isScraping) break;
             if (isPaused) {
-                currentHitStartIndex = i; // remember exact position for resume
+                currentHitStartIndex = i;
                 pausedMidPage = true;
+                saveGmapsSession();
                 break;
             }
-            if (scrapedData.length >= targetLimit) break;
+            if (portalCount >= targetLimit) break;
 
-            // Limit batch to remaining capacity so at most `remaining` promises can push
-            const remaining = targetLimit - scrapedData.length;
+            const remaining = targetLimit - portalCount;
             const chunk = hitsArray.slice(i, i + Math.min(BATCH_SIZE, Math.max(remaining, 1)));
 
             await Promise.allSettled(chunk.map(hit => {
-                // Atomic guard: synchronous check right before processing
-                if (!isScraping || isPaused || scrapedData.length >= targetLimit) return Promise.resolve();
+                if (!isScraping || isPaused || portalCount >= targetLimit) return Promise.resolve();
                 return processHit(hit);
             }));
 
-            // Save data once per chunk
-            chrome.storage.local.set({ scrapedData });
+            // Recalculate portalCount after parallel batch
+            portalCount = scrapedData.filter(d => d.source === PORTAL_SOURCE).length;
+
+            // Trim any overshoot from parallel race conditions
+            if (portalCount > targetLimit) {
+                scrapedData = scrapedData.filter(d => d.source !== PORTAL_SOURCE)
+                    .concat(scrapedData.filter(d => d.source === PORTAL_SOURCE).slice(0, targetLimit));
+                portalCount = targetLimit;
+            }
+
+            // Save session after each batch for crash recovery
+            saveGmapsSession();
         }
 
-        if (!isScraping || scrapedData.length >= targetLimit) break;
+        if (!isScraping || portalCount >= targetLimit) break;
 
-        // Paused mid-page: don't advance to the next page URL.
-        // The outer while loop's polling block will wait for resume,
-        // then re-fetch the same page starting from currentHitStartIndex.
         if (pausedMidPage) continue;
 
-        // Finished this page cleanly — reset the hit index for the next page.
         currentHitStartIndex = 0;
 
         const nextPageLink = doc.querySelector('.paging a[title*="chsten"]') || Array.from(doc.querySelectorAll('.paging a')).find(a => a.textContent.trim() === '›');
@@ -333,13 +382,15 @@ async function _startScraping() {
         await sleep(200);
     }
 
-    if (isScraping && !isPaused && (scrapedData.length >= targetLimit || !currentPageUrl)) {
+    portalCount = scrapedData.filter(d => d.source === PORTAL_SOURCE).length;
+    if (isScraping && !isPaused && (portalCount >= targetLimit || !currentPageUrl)) {
         console.log("Scraping finished.");
         if (settings.notifyFinish) finishedSound.play().catch(e => console.error("Audio play error", e));
         isScraping = false;
         isPaused = false;
-        chrome.storage.local.set({ isScraping: false, isPaused: false });
-        chrome.runtime.sendMessage({ action: 'finished', count: scrapedData.length });
+        clearGmapsSession();
+        chrome.storage.local.set({ scrapedData });
+        chrome.runtime.sendMessage({ action: 'finished', count: scrapedData.length, portalCount });
     }
 }
 
@@ -348,7 +399,8 @@ async function _startScraping() {
  */
 async function processHit(hit) {
     if (!isScraping || isPaused) return;
-    if (scrapedData.length >= targetLimit) return;
+    const portalCount = scrapedData.filter(d => d.source === PORTAL_SOURCE).length;
+    if (portalCount >= targetLimit) return;
 
     try {
         const nameLink = hit.querySelector('.hitlnk_name');
@@ -370,8 +422,9 @@ async function processHit(hit) {
             }
 
             processedHits++;
-            chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, currentTitle: `[DÖ] Checked ${processedHits} hits... Scanning ${company}` });
-            await sleep(Math.random() * 80 + 20); // Reduced jitter for speed
+            const pc = scrapedData.filter(d => d.source === PORTAL_SOURCE).length;
+            chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, portalCount: pc, currentTitle: `[DÖ] Checked ${processedHits} hits... Scanning ${company}` });
+            await sleepWithThrottle(Math.random() * 80 + 20);
 
             // Quick check: try to extract email directly from the list-page hit HTML
             let email = extractEmailFromHtml(hit.innerHTML);
@@ -397,9 +450,11 @@ async function processHit(hit) {
                 const isDuplicate = scrapedData.some(item => item.email.toLowerCase() === email.toLowerCase());
                 
                 // Atomic guard: synchronous check + push with no await in between
-                if (!isDuplicate && scrapedData.length < targetLimit) {
-                    scrapedData.push({ company, address, phone, email, source: 'Google Maps', extractedAt: new Date().toISOString() });
-                    chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, currentTitle: `[DÖ] Found email for: ${company}` });
+                const currentPortalCount = scrapedData.filter(d => d.source === PORTAL_SOURCE).length;
+                if (!isDuplicate && currentPortalCount < targetLimit) {
+                    scrapedData.push({ company, address, phone, email, source: PORTAL_SOURCE, extractedAt: new Date().toISOString() });
+                    const newPc = currentPortalCount + 1;
+                    chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, portalCount: newPc, currentTitle: `[DÖ] Found email for: ${company}` });
                 }
             }
         }
@@ -425,20 +480,21 @@ chrome.runtime.onMessage.addListener(
             start: (request, sendResponse) => {
                 isScraping = true;
                 isPaused = false;
-                currentPageUrl = null;     // always restart from page 1 on fresh start
-                currentHitStartIndex = 0;  // always restart hit index
+                currentPageUrl = null;
+                currentHitStartIndex = 0;
                 if (request.reset) {
                     scrapedData = [];
                     processedHits = 0;
                 }
                 targetLimit = request.limit || 50;
+                saveGmapsSession();
                 startScraping();
                 sendResponse({ status: 'started' });
             },
             stop: (request, sendResponse) => {
                 isScraping = false;
                 isPaused = false;
-                currentPageUrl = null;
+                clearGmapsSession();
                 chrome.storage.local.set({ scrapedData });
                 sendResponse({ status: 'stopped' });
             },
@@ -449,6 +505,7 @@ chrome.runtime.onMessage.addListener(
                 currentPageUrl = null;
                 currentHitStartIndex = 0;
                 processedHits = 0;
+                clearGmapsSession();
                 chrome.storage.local.set({ scrapedData: [] });
                 sendResponse({ status: 'reset' });
             },
@@ -457,16 +514,16 @@ chrome.runtime.onMessage.addListener(
             },
             getInitialInfo: (request, sendResponse) => {
                 getDasOertlicheTotal().then(total => {
+                    const portalCount = scrapedData.filter(d => d.source === PORTAL_SOURCE).length;
                     sendResponse({
                         total: total,
-                        scrapedCount: scrapedData.length,
+                        scrapedCount: portalCount,
                         isScraping,
                         isPaused
                     });
                 });
             },
             countResults: (request, sendResponse) => {
-                // FIX: Removed gratuitous 1.5s setTimeout — respond immediately when data is ready
                 getDasOertlicheTotal().then(total => {
                     sendResponse({ total: total });
                 });

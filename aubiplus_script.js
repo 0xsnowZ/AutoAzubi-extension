@@ -3,6 +3,8 @@ let isScraping = false;
 let isPaused = false;
 let targetLimit = 50;
 
+const PORTAL_SOURCE = 'Aubi-Plus.de';
+
 const finishedSound = new Audio(chrome.runtime.getURL('finished.mp3'));
 let settings = { notifyFinish: true };
 
@@ -50,7 +52,7 @@ async function handleSearchPage(limit = 50) {
 
     let docToSearch = document;
 
-    while (keepGoing && currentData.length < limit) {
+    while (keepGoing && currentData.filter(d => d.source === PORTAL_SOURCE).length < limit) {
         if (!isScraping) break;
 
         while (isPaused) {
@@ -125,7 +127,7 @@ async function handleSearchPage(limit = 50) {
                 if (!isScraping) break;
             }
             if (!isScraping) break;
-            if (currentData.length >= limit) break;
+            if (currentData.filter(d => d.source === PORTAL_SOURCE).length >= limit) break;
 
             const batch = cardUrls.slice(i, i + BATCH_SIZE);
             const results = await Promise.allSettled(batch.map(async (href) => {
@@ -195,12 +197,19 @@ async function handleSearchPage(limit = 50) {
             // Process batch results
             for (const result of results) {
                 if (result.status !== 'fulfilled' || !result.value) continue;
-                if (currentData.length >= limit) break;
+                if (currentData.filter(d => d.source === PORTAL_SOURCE).length >= limit) break;
 
                 const { href, companyName, address, email, phone, contact } = result.value;
 
                 if (!email) {
-                    chrome.runtime.sendMessage({ action: 'progress', count: currentData.length, currentTitle: `[Aubi-Plus] Checking: ${companyName || 'Unknown'} (no email)` });
+                    chrome.runtime.sendMessage({ action: 'progress', count: currentData.length, portalCount: currentData.filter(d => d.source === PORTAL_SOURCE).length, currentTitle: `[Aubi-Plus] Checking: ${companyName || 'Unknown'} (no email)` });
+                    continue;
+                }
+
+                // Email dedup: skip if this email was already scraped
+                const isDuplicate = currentData.some(d => d.email.toLowerCase() === email.toLowerCase());
+                if (isDuplicate) {
+                    console.log("[AubiPlus] Duplicate email, skipping:", email);
                     continue;
                 }
 
@@ -213,11 +222,11 @@ async function handleSearchPage(limit = 50) {
                     anrede: '',
                     link: href,
                     phone: phone,
-                    source: 'Aubi-Plus.de',
+                    source: PORTAL_SOURCE,
                     extractedAt: new Date().toISOString()
                 });
 
-                chrome.runtime.sendMessage({ action: 'progress', count: currentData.length, currentTitle: companyName });
+                chrome.runtime.sendMessage({ action: 'progress', count: currentData.length, portalCount: currentData.filter(d => d.source === PORTAL_SOURCE).length, currentTitle: companyName });
             }
 
             // Save once per batch instead of per-item
@@ -229,7 +238,8 @@ async function handleSearchPage(limit = 50) {
 
     if (isScraping) {
         if (settings.notifyFinish) finishedSound.play();
-        chrome.runtime.sendMessage({ action: 'finished', count: currentData.length });
+        const portalCount = currentData.filter(d => d.source === PORTAL_SOURCE).length;
+        chrome.runtime.sendMessage({ action: 'finished', count: currentData.length, portalCount });
     }
     isScraping = false;
     isPaused = false;

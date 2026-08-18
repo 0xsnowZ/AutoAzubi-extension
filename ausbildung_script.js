@@ -7,6 +7,8 @@
 let isScraping = false;
 let isPaused = false;
 
+const PORTAL_SOURCE = 'Ausbildung.de';
+
 const finishedSound = new Audio(chrome.runtime.getURL("finished.mp3"));
 let settings = { notifyFinish: true };
 
@@ -77,7 +79,7 @@ async function runScraping(session) {
   const MAX_EMPTY_PAGES = 3;
   const MAX_DRY_PAGES = 5;     // Stop if 5 consecutive pages yield no emails
 
-  while (isScraping && currentData.length < limit) {
+  while (isScraping && currentData.filter(d => d.source === PORTAL_SOURCE).length < limit) {
     // ── Pause loop ──────────────────────────────────────────────────────────
     while (isPaused) {
       await sleep(500);
@@ -120,7 +122,7 @@ async function runScraping(session) {
           if (!isScraping) return;
         }
       }
-      if (currentData.length >= limit) break;
+      if (currentData.filter(d => d.source === PORTAL_SOURCE).length >= limit) break;
 
       processedLinks.add(jobUrl);
       processedHits++;
@@ -128,6 +130,7 @@ async function runScraping(session) {
       chrome.runtime.sendMessage({
         action: "progress",
         count: currentData.length,
+        portalCount: currentData.filter(d => d.source === PORTAL_SOURCE).length,
         currentTitle: `[Ausbildung] Job ${processedHits} · Page ${page}`,
       });
 
@@ -147,7 +150,7 @@ async function runScraping(session) {
 
         // Strict deduplication by normalized email
         const isDuplicate = currentData.some(
-          (item) => item.email === email,
+          (item) => item.email.toLowerCase() === email.toLowerCase(),
         );
         if (isDuplicate) {
           console.log(`[Ausbildung] Skipping duplicate: ${email}`);
@@ -159,13 +162,14 @@ async function runScraping(session) {
         const company = extractCompanyFromDoc(doc);
         const address = extractAddressFromDoc(doc);
 
-        currentData.push({ company, email, address, contact: "", anrede: "", link: jobUrl, phone: "", source: "Ausbildung.de", extractedAt: new Date().toISOString() });
+        currentData.push({ company, email, address, contact: "", anrede: "", link: jobUrl, phone: "", source: PORTAL_SOURCE, extractedAt: new Date().toISOString() });
 
         // Persist to storage immediately so no data is lost on crash/stop
         await new Promise((r) => chrome.storage.local.set({ scrapedData: currentData }, r));
         chrome.runtime.sendMessage({
           action: "progress",
           count: currentData.length,
+          portalCount: currentData.filter(d => d.source === PORTAL_SOURCE).length,
           currentTitle: `[Ausbildung] ✓ ${company}`,
         });
         console.log(`[Ausbildung] ✓ (${currentData.length}/${limit}): ${company} <${email}>`);
@@ -175,10 +179,10 @@ async function runScraping(session) {
       }
 
       // Anti-bot jitter: 200–450ms randomized delay
-      await sleep(Math.floor(Math.random() * 250) + 200);
+      await sleepWithThrottle(Math.floor(Math.random() * 250) + 200);
     }
 
-    if (currentData.length >= limit) break;
+    if (currentData.filter(d => d.source === PORTAL_SOURCE).length >= limit) break;
 
     // If this page had zero new emails, increment dry page counter
     if (currentData.length === countBefore) {
@@ -214,9 +218,11 @@ async function runScraping(session) {
 
   if (wasRunning) {
     if (settings.notifyFinish) finishedSound.play().catch(() => {});
+    const portalCount = currentData.filter(d => d.source === PORTAL_SOURCE).length;
     chrome.runtime.sendMessage({ 
       action: "finished", 
       count: currentData.length,
+      portalCount,
       early: dryPageCount >= MAX_DRY_PAGES,
       empty: emptyPageCount >= MAX_EMPTY_PAGES 
     });

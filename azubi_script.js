@@ -3,6 +3,8 @@ let isScraping = false;
 let isPaused = false;
 let targetLimit = 50;
 
+const PORTAL_SOURCE = 'Azubi.de';
+
 const finishedSound = new Audio(chrome.runtime.getURL("finished.mp3"));
 let settings = { notifyFinish: true };
 
@@ -86,7 +88,7 @@ async function handleSearchPage(limit = 50) {
   let emptyPageCount = 0;
   const MAX_EMPTY_PAGES = 10;
 
-  while (isScraping && currentData.length < limit) {
+  while (isScraping && currentData.filter(d => d.source === PORTAL_SOURCE).length < limit) {
     // Pause check
     while (isPaused) {
       await sleep(500);
@@ -140,7 +142,7 @@ async function handleSearchPage(limit = 50) {
 
     for (const jobUrl of jobLinks) {
       if (!isScraping || isPaused) break;
-      if (currentData.length >= limit) break;
+      if (currentData.filter(d => d.source === PORTAL_SOURCE).length >= limit) break;
 
       processedLinks.add(jobUrl);
 
@@ -168,7 +170,7 @@ async function handleSearchPage(limit = 50) {
         const address = extractAddressFromDoc(doc);
 
         // Email dedup: skip if this email was already scraped
-        const isDuplicate = currentData.some(d => d.email === email);
+        const isDuplicate = currentData.some(d => d.email.toLowerCase() === email.toLowerCase());
         if (isDuplicate) {
           console.log("[Azubi] Duplicate email, skipping:", email);
           continue;
@@ -182,16 +184,18 @@ async function handleSearchPage(limit = 50) {
           anrede: "",
           link: jobUrl,
           phone,
-          source: "Azubi.de",
+          source: PORTAL_SOURCE,
           extractedAt: new Date().toISOString(),
         });
 
         await new Promise((r) =>
           chrome.storage.local.set({ scrapedData: currentData }, r),
         );
+        const portalCount = currentData.filter(d => d.source === PORTAL_SOURCE).length;
         chrome.runtime.sendMessage({
           action: "progress",
           count: currentData.length,
+          portalCount,
           currentTitle: company,
         });
         console.log(`[Azubi] Extracted (${currentData.length}/${limit}):`, {
@@ -204,20 +208,22 @@ async function handleSearchPage(limit = 50) {
         console.error("[Azubi] Error fetching:", jobUrl, err);
       }
 
-      await sleep(300);
+      await sleepWithThrottle(300);
     }
 
     // Move to next page after processing all links on this page
-    if (currentData.length < limit) {
+    if (currentData.filter(d => d.source === PORTAL_SOURCE).length < limit) {
       page++;
     }
   }
 
   if (isScraping) {
     if (settings.notifyFinish) finishedSound.play().catch(() => {});
+    const portalCount = currentData.filter(d => d.source === PORTAL_SOURCE).length;
     chrome.runtime.sendMessage({
       action: "finished",
       count: currentData.length,
+      portalCount,
     });
   }
   isScraping = false;

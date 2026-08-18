@@ -57,7 +57,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const ausbildungBtn = document.getElementById("ausbildung-btn");
   const aubiplusBtn = document.getElementById("aubiplus-btn");
   const azubiBtn = document.getElementById("azubi-btn");
-  const downloadBtn = document.getElementById("download-btn");
+  const downloadExcelBtn = document.getElementById("download-excel-btn");
   const statusText = document.getElementById("status-text");
   const countDisplay = document.getElementById("scraped-count");
   const totalDisplay = document.getElementById("total-found");
@@ -176,6 +176,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         activeSiteBadge.classList.add("hidden");
       }
     }
+    return matched;
   }
 
   // GMaps UI Elements
@@ -297,7 +298,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (result.scrapedData) {
           countDisplay.innerText = result.scrapedData.length;
-          downloadBtn.disabled = result.scrapedData.length === 0;
+          downloadExcelBtn.disabled = result.scrapedData.length === 0;
           updateProgress();
         }
 
@@ -346,6 +347,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Handle loading state
     if (currTab.status === "loading" && retryCount < 3) {
       console.log("Tab is loading, retrying in 1s...");
+      if (retryCount === 0 && activityLog) {
+        activityLog.innerText = "Connecting to page...";
+        activityLog.classList.add("active");
+      }
       setTimeout(
         () => sendMessageToTab(message, callback, retryCount + 1),
         1000,
@@ -365,6 +370,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             errorMsg.includes("Receiving end does not exist"))
         ) {
           console.log("Content script missing. Attempting manual injection...");
+          if (activityLog) {
+            activityLog.innerText = "Initializing content script...";
+            activityLog.classList.add("active");
+          }
           try {
             let scriptToInject = "content_script.js";
             if (
@@ -505,26 +514,41 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }
 
-    // Download button label
+    // Export button label
     const count = parseInt(countDisplay.innerText) || 0;
-    if (downloadBtn) {
-      const span = downloadBtn.querySelector("span[data-i18n]");
-      if (span) {
-        span.innerText =
-          count > 0
-            ? i18n[currentLang]["downloadBtn"]
-            : currentLang === "ar"
-              ? "لا توجد بيانات بعد"
-              : "No data yet";
-      }
-    }
+    if (downloadExcelBtn) downloadExcelBtn.disabled = count === 0;
   }
 
   // Get initial info about total offers
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
   // Highlight the portal matching the current tab
-  detectActivePortal(tab ? tab.url : "");
+  const activePortalLabel = detectActivePortal(tab ? tab.url : "");
+
+  // Per-portal limit: restore saved limit for the active portal
+  if (activePortalLabel) {
+    chrome.storage.local.get(['portalLimits'], (res) => {
+      const limits = res.portalLimits || {};
+      const key = activePortalLabel.toLowerCase().replace(/[^a-z]/g, '');
+      if (limits[key]) {
+        limitInput.value = limits[key];
+        updateProgress();
+      }
+    });
+  }
+
+  // Save limit per portal when changed
+  limitInput.addEventListener('change', () => {
+    const portalName = detectActivePortalName();
+    if (portalName && portalName !== 'Unknown') {
+      const key = portalName.toLowerCase().replace(/[^a-z]/g, '');
+      chrome.storage.local.get(['portalLimits'], (res) => {
+        const limits = res.portalLimits || {};
+        limits[key] = parseInt(limitInput.value) || 50;
+        chrome.storage.local.set({ portalLimits: limits });
+      });
+    }
+  });
 
   // Auto-navigate removed based on user request
 
@@ -629,7 +653,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (response && response.status === "reset") {
           countDisplay.innerText = "0";
           totalDisplay.innerText = "\u2014";
-          downloadBtn.disabled = true;
+          downloadExcelBtn.disabled = true;
           updateProgress();
           updateUI("idle");
           showToast(toastContainer, i18n[currentLang]["toastReset"], "info");
@@ -698,10 +722,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  downloadBtn.addEventListener("click", () => {
+
+  downloadExcelBtn.addEventListener("click", () => {
     sendMessageToTab({ action: "getData" }, (response) => {
       if (response && response.data) {
-        downloadCSV(response.data);
+        downloadExcel(response.data);
         showToast(toastContainer, i18n[currentLang]["toastExported"], "success");
       }
     });
@@ -737,9 +762,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         statusText.innerText = i18n[currentLang]["waitingCaptcha"];
         activityLog.innerText = "Captcha detected... Please solve.";
         showToast(toastContainer, i18n[currentLang]["toastCaptcha"], "warning");
+      } else if (request.status === "throttling") {
+        // Rate limiting visualization
+        activityLog.classList.add("active", "throttling");
+        activityLog.innerText = `⏳ ${i18n[currentLang]["throttling"]}`;
       } else {
-        animateCount(countDisplay, request.count);
-        PopupMetrics.updateMetrics(request.count || 0);
+        // Normal progress — use portalCount if available for per-portal accuracy
+        const displayCount = request.portalCount !== undefined ? request.portalCount : request.count;
+        animateCount(countDisplay, displayCount);
+        PopupMetrics.updateMetrics(displayCount || 0);
+        activityLog.classList.remove("throttling");
         if (request.currentTitle) {
           const tempEl = document.createElement("textarea");
           tempEl.innerHTML = request.currentTitle;
@@ -747,20 +779,19 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         // Update progress after animation settles
         setTimeout(updateProgress, 420);
-        downloadBtn.disabled = false;
-        // Update download button label live
-        const span = downloadBtn.querySelector("span[data-i18n]");
-        if (span) span.innerText = i18n[currentLang]["downloadBtn"];
+        downloadExcelBtn.disabled = false;
         // Update preview table
         updatePreviewFromStorage();
       }
     } else if (request.action === "finished") {
-      animateCount(countDisplay, request.count);
+      const displayCount = request.portalCount !== undefined ? request.portalCount : request.count;
+      animateCount(countDisplay, displayCount);
+      activityLog.classList.remove("throttling");
       setTimeout(() => {
         updateUI("finished", request);
       }, 420);
-      downloadBtn.disabled = false;
-      const count = request.count || 0;
+      downloadExcelBtn.disabled = false;
+      const count = displayCount || 0;
       PopupMetrics.saveFinalMetrics(count);
       showToast(
         toastContainer,

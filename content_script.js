@@ -10,6 +10,8 @@ let targetLimit = 0;
 let filtersApplied = false;
 let currentCardIndex = 0;
 
+const PORTAL_SOURCE = 'Arbeitsagentur';
+
 // Audio setup
 const captchaSound = new Audio(chrome.runtime.getURL('captcha.mp3'));
 const finishedSound = new Audio(chrome.runtime.getURL('finished.mp3'));
@@ -54,72 +56,72 @@ function updateStorage() {
 // waitForElement() provided by utils.js (MutationObserver-based, loaded first via manifest.json)
 
 // Listen for messages from popup
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.settings) {
-        settings = request.settings;
-        chrome.storage.local.set(settings);
-    }
-
-    switch (request.action) {
-        case 'start':
-            isScraping = true;
-            isPaused = false;
-            if (request.reset) {
+// Uses shared createScraperMessageHandler from utils.js for consistency.
+chrome.runtime.onMessage.addListener(
+    createScraperMessageHandler(
+        () => ({ isScraping, isPaused }),
+        {
+            onSettings: (s) => {
+                settings = s;
+                chrome.storage.local.set(s);
+            },
+            onPause: () => {
+                isPaused = true;
+                updateStorage();
+            },
+            onResume: () => {
+                isPaused = false;
+                updateStorage();
+                if (isScraping) startScraping();
+            },
+            onStop: () => {
+                isScraping = false;
+                isPaused = false;
+                updateStorage();
+            },
+            start: (request, sendResponse) => {
+                isScraping = true;
+                isPaused = false;
+                if (request.reset) {
+                    scrapedData = [];
+                    filtersApplied = false;
+                    currentCardIndex = 0;
+                }
+                targetLimit = request.limit || 50;
+                updateStorage();
+                startScraping();
+                sendResponse({ status: 'started' });
+            },
+            reset: (request, sendResponse) => {
+                isScraping = false;
+                isPaused = false;
                 scrapedData = [];
                 filtersApplied = false;
                 currentCardIndex = 0;
-            }
-            targetLimit = request.limit || 50;
-            updateStorage();
-            startScraping();
-            sendResponse({ status: 'started' });
-            break;
-        case 'pause':
-            isPaused = true;
-            updateStorage();
-            sendResponse({ status: 'paused' });
-            break;
-        case 'resume':
-            isPaused = false;
-            updateStorage();
-            if (isScraping) startScraping();
-            sendResponse({ status: 'resumed' });
-            break;
-        case 'stop':
-            isScraping = false;
-            isPaused = false;
-            updateStorage();
-            sendResponse({ status: 'stopped' });
-            break;
-        case 'reset':
-            isScraping = false;
-            isPaused = false;
-            scrapedData = [];
-            filtersApplied = false;
-            currentCardIndex = 0;
-            updateStorage();
-            sendResponse({ status: 'reset' });
-            break;
-        case 'getData':
-            sendResponse({ data: scrapedData });
-            break;
-        case 'getInitialInfo':
-            getInitialInfo().then(total => sendResponse({
-                total,
-                scrapedCount: scrapedData.length,
-                isScraping,
-                isPaused
-            }));
-            return true;
-        case 'countResults':
-            countResults().then(total => {
-                filtersApplied = true;
                 updateStorage();
-                sendResponse({ total });
-            });
-            return true;
-    }
-});
+                sendResponse({ status: 'reset' });
+            },
+            getData: (request, sendResponse) => {
+                sendResponse({ data: scrapedData });
+            },
+            getInitialInfo: (request, sendResponse) => {
+                getInitialInfo().then(total => sendResponse({
+                    total,
+                    scrapedCount: scrapedData.filter(d => d.source === PORTAL_SOURCE).length,
+                    isScraping,
+                    isPaused
+                }));
+            },
+            countResults: (request, sendResponse) => {
+                countResults().then(total => {
+                    filtersApplied = true;
+                    updateStorage();
+                    sendResponse({ total });
+                });
+            },
+        }
+    )
+);
 
 async function getInitialInfo() {
     const total = document.getElementById('suchergebnis-h1-anzeige');
@@ -170,10 +172,12 @@ async function _startScraping() {
 
         let cards = document.querySelectorAll('[id^="ergebnisliste-item-"]');
 
-        if (scrapedData.length < targetLimit) {
+        let portalCount = scrapedData.filter(d => d.source === PORTAL_SOURCE).length;
+
+        if (portalCount < targetLimit) {
             for (let i = currentCardIndex; i < cards.length; i++) {
                 if (!isScraping || isPaused) break;
-                if (scrapedData.length >= targetLimit) break;
+                if (portalCount >= targetLimit) break;
 
                 const card = cards[i];
                 card.click();
@@ -206,7 +210,7 @@ async function _startScraping() {
                 const info = extractInfo();
                 if (info) {
                     // Email dedup: skip if this email was already scraped
-                    const isDuplicate = scrapedData.some(d => d.email === info.email);
+                    const isDuplicate = scrapedData.some(d => d.email.toLowerCase() === info.email.toLowerCase());
                     if (isDuplicate) {
                         console.log(`Card ${i}: Duplicate email ${info.email}, skipping.`);
                     } else {
@@ -214,21 +218,23 @@ async function _startScraping() {
                         info.link = linkElement ? linkElement.href : '';
 
                         scrapedData.push(info);
+                        portalCount++;
                         updateStorage();
-                        console.log(`Extracted (${scrapedData.length}/${targetLimit}):`, info);
-                        chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, currentTitle: info.company });
+                        console.log(`Extracted (${portalCount}/${targetLimit}):`, info);
+                        chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, portalCount, currentTitle: info.company });
                     }
                 } else {
                     console.log(`Card ${i}: No email found, skipping.`);
                 }
 
-                await sleep(150);
+                await sleepWithThrottle(150);
                 currentCardIndex = i + 1;
                 updateStorage();
             }
         }
 
-        if (scrapedData.length >= targetLimit) {
+        portalCount = scrapedData.filter(d => d.source === PORTAL_SOURCE).length;
+        if (portalCount >= targetLimit) {
             console.log("Target limit reached.");
             break;
         }
@@ -245,12 +251,12 @@ async function _startScraping() {
     }
 
     // Only set finished if we actually hit the limit or ran out of results
-    if (isScraping && !isPaused && (scrapedData.length >= targetLimit || !document.getElementById('ergebnisliste-ladeweitere-button'))) {
+    if (isScraping && !isPaused && (portalCount >= targetLimit || !document.getElementById('ergebnisliste-ladeweitere-button'))) {
         if (settings.notifyFinish) finishedSound.play();
         isScraping = false;
         isPaused = false;
         updateStorage();
-        chrome.runtime.sendMessage({ action: 'finished', count: scrapedData.length });
+        chrome.runtime.sendMessage({ action: 'finished', count: scrapedData.length, portalCount });
     }
 }
 

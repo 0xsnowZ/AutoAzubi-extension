@@ -202,7 +202,7 @@ body[dir="rtl"] {
   box-shadow:
     0 1px 4px rgba(0, 0, 0, 0.06),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(99, 102, 241, 0.15);
+  border: 1px solid transparent;
 }
 
 
@@ -407,6 +407,17 @@ body[data-theme="dark"] .progress-ring-bg {
 
 .activity-log.active {
   opacity: 1;
+}
+
+.activity-log.throttling {
+  opacity: 1;
+  color: var(--warning);
+  animation: throttle-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes throttle-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
 
 .status-value {
@@ -909,6 +920,8 @@ input::placeholder {
   border: 1px solid rgba(92, 120, 56, 0.18);
 }
 
+
+
 /* ── Button Row (Ongoing Buttons) ──────────────────── */
 .btn-row {
   display: flex;
@@ -1227,59 +1240,34 @@ details.settings-section[open] summary .chevron {
   position: relative;
   z-index: 1;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  width: 100%;
-}
-
-.gmaps-pin-badge {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #ef5350 0%, #c62828 100%);
-  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  flex-shrink: 0;
-  box-shadow:
-    0 4px 14px rgba(232, 72, 60, 0.35),
-    0 0 0 3px rgba(255, 255, 255, 0.15);
-  animation: pin-float 3s ease-in-out infinite;
-}
-
-@keyframes pin-float {
-
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-3px);
-  }
+  text-align: center;
+  padding: 24px 16px;
+  width: 100%;
 }
 
 .gmaps-hero-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .gmaps-title {
   font-family: "Outfit", sans-serif;
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
   color: #fff;
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
 }
 
 .gmaps-subtitle {
-  font-size: 11.5px;
-  color: rgba(255, 255, 255, 0.72);
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.85);
   margin-top: 0;
+  font-weight: 500;
 }
 
 body[data-theme="dark"] .gmaps-subtitle {
@@ -1348,8 +1336,8 @@ body[data-theme="dark"] .gmaps-hero-overlay {
 }
 
 .gmaps-field-icon--pin {
-  color: #ef5350;
-  background: rgba(239, 83, 80, 0.08);
+  color: var(--accent-2);
+  background: rgba(99, 102, 241, 0.08);
 }
 
 .gmaps-field-row:focus-within .gmaps-field-icon--search {
@@ -1359,7 +1347,7 @@ body[data-theme="dark"] .gmaps-hero-overlay {
 
 .gmaps-field-row:focus-within .gmaps-field-icon--pin {
   color: #fff;
-  background: #ef5350;
+  background: var(--accent);
 }
 
 .gmaps-field-body {
@@ -1371,10 +1359,10 @@ body[data-theme="dark"] .gmaps-hero-overlay {
 }
 
 .gmaps-field-label {
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: var(--text-dim);
   line-height: 1;
   pointer-events: none;
 }
@@ -1427,7 +1415,7 @@ body[data-theme="dark"] .gmaps-field-icon--search {
 }
 
 body[data-theme="dark"] .gmaps-field-icon--pin {
-  background: rgba(239, 83, 80, 0.14);
+  background: rgba(99, 102, 241, 0.14);
 }
 
 /* ── Search CTA ────────────────────────────────────── */
@@ -1494,10 +1482,10 @@ body[data-theme="dark"] .gmaps-field-icon--pin {
 
 .btn-gmaps-cta:hover:not(:disabled) {
   background: linear-gradient(135deg, #f06260 0%, #d32f2f 100%);
-  transform: translateY(-2px);
   box-shadow:
-    0 12px 30px -6px rgba(198, 40, 40, 0.6),
-    0 4px 10px -2px rgba(198, 40, 40, 0.25);
+    0 10px 25px -5px rgba(198, 40, 40, 0.6),
+    0 4px 10px -2px rgba(198, 40, 40, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .btn-gmaps-cta:active:not(:disabled) {
@@ -1685,6 +1673,7 @@ body[data-theme="dark"] .btn-download:not(:disabled) {
   border-color: rgba(130, 180, 80, 0.15);
 }
 
+
 body[data-theme="dark"] .status-right {
   background: linear-gradient(135deg,
       rgba(255, 255, 255, 0.04) 0%,
@@ -1712,8 +1701,8 @@ body[data-theme="dark"] .tab-btn.active {
       rgba(99, 102, 241, 0.14) 0%,
       rgba(28, 31, 38, 0.9) 100%);
   color: #a5b4fc;
-  border: 1px solid rgba(99, 102, 241, 0.25);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  border: 1px solid transparent;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 

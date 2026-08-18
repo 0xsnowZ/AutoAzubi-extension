@@ -8,6 +8,21 @@
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Sleep with rate-limiting notification to the popup.
+ * Sends a 'throttling' progress message so the user sees anti-bot delays are intentional.
+ * Only notifies for delays >= 200ms — shorter pauses aren't perceptible as rate limiting.
+ * @param {number} ms - Duration to sleep in milliseconds
+ */
+async function sleepWithThrottle(ms) {
+  if (ms >= 200) {
+    try {
+      chrome.runtime.sendMessage({ action: 'progress', status: 'throttling', delay: ms });
+    } catch (e) { /* popup may be closed */ }
+  }
+  return sleep(ms);
+}
+
 // ─── Email Extraction (9 strategies, most reliable → broadest) ───────────────────
 
 function extractEmailFromHtml(rawHtml) {
