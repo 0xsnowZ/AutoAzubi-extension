@@ -22,7 +22,7 @@ const finishedSound = new Audio(chrome.runtime.getURL('finished.mp3'));
 
 // Settings Cache
 let settings = {
-    notifyCaptcha: true,
+    notifyCaptcha: false,
     notifyFinish: true
 };
 
@@ -50,7 +50,7 @@ function clearGmapsSession() {
 // Initialize State from Storage — auto-resume if a session was active
 chrome.storage.local.get(['scrapedData', GMAPS_SESSION_KEY, 'notifyCaptcha', 'notifyFinish'], (result) => {
     if (result.scrapedData) scrapedData = result.scrapedData;
-    settings.notifyCaptcha = result.notifyCaptcha !== false;
+    settings.notifyCaptcha = result.notifyCaptcha === true;
     settings.notifyFinish = result.notifyFinish !== false;
 
     const session = result[GMAPS_SESSION_KEY];

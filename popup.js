@@ -300,7 +300,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         "finalSpeed",
       ],
       (result) => {
-        notifyCaptchaCheckbox.checked = result.notifyCaptcha !== false;
+        notifyCaptchaCheckbox.checked = result.notifyCaptcha === true;
         notifyFinishCheckbox.checked = result.notifyFinish !== false;
 
         if (result.scrapedData) {

@@ -18,7 +18,7 @@ const finishedSound = new Audio(chrome.runtime.getURL('finished.mp3'));
 
 // Settings Cache
 let settings = {
-    notifyCaptcha: true,
+    notifyCaptcha: false,
     notifyFinish: true
 };
 
@@ -31,7 +31,7 @@ chrome.storage.local.get(['scrapedData', 'isScraping', 'isPaused', 'targetLimit'
     if (result.filtersApplied !== undefined) filtersApplied = result.filtersApplied;
     if (result.currentCardIndex !== undefined) currentCardIndex = result.currentCardIndex;
 
-    settings.notifyCaptcha = result.notifyCaptcha !== false;
+    settings.notifyCaptcha = result.notifyCaptcha === true;
     settings.notifyFinish = result.notifyFinish !== false;
 
     console.log(`State recovered: ${scrapedData.length} records, isScraping: ${isScraping}, isPaused: ${isPaused}`);
