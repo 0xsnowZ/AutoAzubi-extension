@@ -214,7 +214,16 @@ async function _startScraping() {
                 const bewerbungBtn = document.getElementById('detailansicht-zur-bewerbung');
                 if (bewerbungBtn) {
                     bewerbungBtn.click();
-                    // Don't use a fixed sleep — fall through to the smart wait below
+                    // Wait for either captcha OR contact details to appear
+                    await waitForElement(
+                        () => document.getElementById('captchaForm')
+                            || document.querySelector('form[id*="captcha"]')
+                            || document.getElementById('kontaktdaten-captcha-input')
+                            || document.querySelector('[id*="kontaktdaten-captcha"]')
+                            || document.getElementById('detail-bewerbung-mail')
+                            || document.getElementById('detail-bewerbung-adresse'),
+                        4000
+                    );
                 }
 
                 // Handle captcha (appears after requesting contact info)
@@ -226,7 +235,7 @@ async function _startScraping() {
                 // Smart wait: poll for contact details to appear (up to 4 seconds)
                 await waitForElement(
                     () => document.getElementById('detail-bewerbung-mail') || document.getElementById('detail-bewerbung-adresse'),
-                    4000, 200
+                    4000
                 );
 
                 const info = extractInfo();
