@@ -2522,3 +2522,211 @@ body[data-theme="dark"] .history-portal-badge {
 [dir="rtl"] .history-card-bottom {
   flex-direction: row-reverse;
 }
+
+/* ── Resume Banner ──────────────────────────────────── */
+.resume-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.15);
+  border-left: 3px solid #f59e0b;
+  border-radius: 10px;
+  animation: resumeBannerIn 0.3s ease forwards;
+}
+
+@keyframes resumeBannerIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.resume-banner-icon {
+  color: #f59e0b;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.resume-banner-text {
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.resume-banner-text strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 2px;
+}
+
+.resume-banner-dismiss {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.resume-banner-dismiss:hover {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+body[data-theme="dark"] .resume-banner {
+  background: rgba(245, 158, 11, 0.05);
+  border-color: rgba(245, 158, 11, 0.12);
+}
+
+body[data-theme="dark"] .resume-banner-text {
+  color: rgba(148, 163, 184, 0.8);
+}
+
+body[data-theme="dark"] .resume-banner-text strong {
+  color: #f1f5f9;
+}
+
+body[data-theme="dark"] .resume-banner-dismiss {
+  color: rgba(148, 163, 184, 0.5);
+}
+
+/* ── Onboarding Tutorial ────────────────────────────── */
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 9998;
+  animation: onboardFadeIn 0.25s ease;
+}
+
+@keyframes onboardFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.onboarding-tooltip {
+  position: fixed;
+  z-index: 10000;
+  background: #1a1e2e;
+  color: #f8fafc;
+  border-radius: 14px;
+  padding: 18px 20px;
+  width: 290px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(99, 102, 241, 0.2);
+  animation: onboardTooltipIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes onboardTooltipIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.onboarding-step-indicator {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(99, 102, 241, 0.8);
+  margin-bottom: 8px;
+}
+
+.onboarding-title {
+  margin: 0 0 6px;
+  font-family: "Outfit", sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  color: #f8fafc;
+  letter-spacing: -0.3px;
+}
+
+.onboarding-desc {
+  margin: 0 0 16px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.onboarding-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.onboarding-skip {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(148, 163, 184, 0.6);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.onboarding-skip:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.onboarding-next {
+  padding: 6px 18px;
+  border: none;
+  border-radius: 8px;
+  background: rgb(99, 102, 241);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.onboarding-next:hover {
+  background: rgb(79, 82, 221);
+  transform: scale(1.03);
+}
+
+.onboarding-highlight {
+  position: relative;
+  z-index: 9999;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5), 0 0 20px rgba(99, 102, 241, 0.2);
+  border-radius: 12px;
+  animation: onboardPulseRing 1.5s ease-in-out infinite;
+}
+
+@keyframes onboardPulseRing {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5), 0 0 20px rgba(99, 102, 241, 0.2);
+  }
+
+  50% {
+    box-shadow: 0 0 0 5px rgba(99, 102, 241, 0.3), 0 0 30px rgba(99, 102, 241, 0.15);
+  }
+}

@@ -198,6 +198,40 @@
           <span data-i18n="exportExcelBtn">Excel</span>
         </button>
 
+        <!-- Data Preview Panel -->
+        <details class="preview-section" id="preview-section">
+          <summary>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+            <span data-i18n="previewTitle">Data Preview</span>
+            <span class="preview-count" id="preview-count">0</span>
+            <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </summary>
+          <div class="preview-content">
+            <div class="preview-table-wrap" id="preview-table-wrap">
+              <table class="preview-table" id="preview-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th data-i18n="previewCompany">Company</th>
+                    <th data-i18n="previewEmail">Email</th>
+                  </tr>
+                </thead>
+                <tbody id="preview-tbody"></tbody>
+              </table>
+            </div>
+            <div class="preview-empty" id="preview-empty" data-i18n="previewEmpty">No data extracted yet</div>
+          </div>
+        </details>
+
         <!-- Portals grid -->
         <div class="section-label">Open Portal</div>
         <div class="portals-grid" id="navigation-btns">
@@ -294,39 +328,6 @@
           </div>
         </details>
       </div>
-
-      <!-- Data Preview Panel -->
-      <details class="preview-section" id="preview-section">
-        <summary>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="16" y1="13" x2="8" y2="13"></line>
-            <line x1="16" y1="17" x2="8" y2="17"></line>
-          </svg>
-          <span data-i18n="previewTitle">Data Preview</span>
-          <span class="preview-count" id="preview-count">0</span>
-          <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6 9 12 15 18 9"></polyline>
-          </svg>
-        </summary>
-        <div class="preview-content">
-          <div class="preview-table-wrap" id="preview-table-wrap">
-            <table class="preview-table" id="preview-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th data-i18n="previewCompany">Company</th>
-                  <th data-i18n="previewEmail">Email</th>
-                </tr>
-              </thead>
-              <tbody id="preview-tbody"></tbody>
-            </table>
-          </div>
-          <div class="preview-empty" id="preview-empty" data-i18n="previewEmpty">No data extracted yet</div>
-        </div>
       </details>
     </div>
 

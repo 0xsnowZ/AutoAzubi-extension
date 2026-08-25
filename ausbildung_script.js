@@ -106,7 +106,7 @@ async function runScraping(session) {
         break;
       }
       // Navigate to next page
-      await navigateToNextPage(page + 1, baseUrl, currentData, limit, processedLinks, processedHits, dryPageCount);
+      await navigateToNextPage(page + 1, baseUrl, currentData, targetLimit, processedLinks, processedHits, dryPageCount);
       return; // Script resumes after page reload
     }
 
@@ -121,7 +121,7 @@ async function runScraping(session) {
       if (!isScraping) return;
       if (isPaused) {
         // Save current progress before entering pause wait
-        await saveSession({ limit, baseUrl, currentData, page, processedLinks: [...processedLinks], processedHits, dryPageCount });
+        await saveSession({ limit: targetLimit, baseUrl, currentData, page, processedLinks: [...processedLinks], processedHits, dryPageCount });
         while (isPaused) {
           await sleep(500);
           if (!isScraping) return;
@@ -189,7 +189,7 @@ async function runScraping(session) {
           portalCount: currentData.filter(d => d.source === PORTAL_SOURCE).length,
           currentTitle: `[Ausbildung] ✓ ${company}`,
         });
-        console.log(`[Ausbildung] ✓ (${currentData.length}/${limit}): ${company} <${email}>`);
+        console.log(`[Ausbildung] ✓ (${currentData.length}/${targetLimit}): ${company} <${email}>`);
 
       } catch (err) {
         console.error(`[Ausbildung] Error processing ${jobUrl}:`, err);
@@ -322,15 +322,6 @@ async function handleSearchPage(limit = 50) {
 
   const session = await loadSession();
   if (!session) return; // No active session, user hasn't started scraping
-
-  // BUG FIX: Guard against resuming on the WRONG page.
-  // If the current URL's page number doesn't match the session's expected page,
-  // a redirect happened. Update the session page to match reality.
-  const actualPage = parseInt(new URL(window.location.href).searchParams.get("page") || "1", 10);
-  if (session.page !== actualPage) {
-    console.warn(`[Ausbildung] Page mismatch: expected ${session.page}, got ${actualPage}. Correcting.`);
-    session.page = actualPage;
-  }
 
   console.log(`[Ausbildung] Auto-resuming session on page ${session.page}...`);
   isScraping = true;

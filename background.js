@@ -94,8 +94,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
     return true; // async response
   }
+
+  // ── Extension Icon Badge ──────────────────────────────────────────────────
+  if (request.action === "progress" && request.count !== undefined) {
+    const text = request.count > 0 ? String(request.count) : "";
+    chrome.action.setBadgeText({ text });
+    return;
+  }
+
+  if (request.action === "finished" || request.action === "stopped") {
+    // Keep the final count visible for 5 seconds, then clear
+    if (request.count) {
+      chrome.action.setBadgeText({ text: String(request.count) });
+      setTimeout(() => chrome.action.setBadgeText({ text: "" }), 5000);
+    } else {
+      chrome.action.setBadgeText({ text: "" });
+    }
+    return;
+  }
+
+  if (request.action === "badgeClear") {
+    chrome.action.setBadgeText({ text: "" });
+    return;
+  }
 });
 
 chrome.runtime.onInstalled.addListener(() => {
   console.log("Extension installed/updated");
+  chrome.action.setBadgeBackgroundColor({ color: "#6366f1" });
+  chrome.action.setBadgeText({ text: "" });
 });

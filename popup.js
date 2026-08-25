@@ -274,7 +274,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   // 1. Load language preference and show scraper directly
   chrome.storage.local.get(["uiLang", "uiTheme"], (res) => {
     applyLanguage(res.uiLang || "en");
-    applyTheme(res.uiTheme || "light");
+    // Auto-detect dark mode from OS if no saved preference
+    const savedTheme = res.uiTheme;
+    if (savedTheme) {
+      applyTheme(savedTheme);
+    } else {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      applyTheme(prefersDark ? "dark" : "light");
+    }
     loadState();
   });
 
@@ -307,7 +314,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         if (result.isScraping) {
-          updateUI(result.isPaused ? "paused" : "running");
+          // Check if the content script is actually running or if this is stale state
+          sendMessageToTab({ action: "getInitialInfo" }, (response) => {
+            if (response && (response.isScraping || response.isPaused)) {
+              // Content script is alive — show real state
+              updateUI(response.isPaused ? "paused" : "running");
+            } else {
+              // Content script not responding — stale state from browser restart
+              showResumeBanner(result.scrapedData ? result.scrapedData.length : 0);
+              updateUI("idle");
+            }
+          });
         } else if (result.scrapedData && result.scrapedData.length > 0) {
           updateUI("finished");
           // Restore final metrics for finished state
@@ -319,6 +336,46 @@ document.addEventListener("DOMContentLoaded", async () => {
         syncSettings();
       },
     );
+  }
+
+  function showResumeBanner(leadCount) {
+    // Remove existing banner if any
+    const existing = document.getElementById("resume-banner");
+    if (existing) existing.remove();
+
+    const banner = document.createElement("div");
+    banner.id = "resume-banner";
+    banner.className = "resume-banner";
+    banner.innerHTML = `
+      <div class="resume-banner-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+      </div>
+      <div class="resume-banner-text">
+        <strong>Session interrupted</strong>
+        <span>${leadCount} leads saved. Navigate to the portal and click Start to resume.</span>
+      </div>
+      <button class="resume-banner-dismiss" id="resume-banner-dismiss" title="Dismiss">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    `;
+
+    // Insert at top of controls area
+    const controls = document.querySelector(".controls");
+    if (controls) {
+      controls.parentNode.insertBefore(banner, controls);
+    }
+
+    document.getElementById("resume-banner-dismiss").addEventListener("click", () => {
+      banner.remove();
+      // Clear stale scraping state
+      chrome.storage.local.set({ isScraping: false, isPaused: false });
+    });
   }
 
   function getSettings() {
@@ -661,6 +718,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           downloadExcelBtn.disabled = true;
           updateProgress();
           updateUI("idle");
+          chrome.runtime.sendMessage({ action: "badgeClear" });
           showToast(toastContainer, i18n[currentLang]["toastReset"], "info");
           // Auto-recount after reset
           sendMessageToTab({ action: "countResults" }, (countResponse) => {
@@ -870,4 +928,122 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Load preview on popup open
   updatePreviewFromStorage();
+
+  // ── Onboarding Tutorial (first-time users) ────────────────────────────────
+  chrome.storage.local.get(["onboardingDone"], (res) => {
+    if (res.onboardingDone) return;
+    showOnboarding();
+  });
+
+  function showOnboarding() {
+    const steps = [
+      {
+        target: "#navigation-btns",
+        title: "Step 1 — Open a Portal",
+        desc: "Click any portal button to navigate to a job search site. Search for Ausbildung listings first.",
+        position: "bottom"
+      },
+      {
+        target: ".limit-pill",
+        title: "Step 2 — Set Your Limit",
+        desc: "Choose how many leads to extract. Click MAX to extract all available offers.",
+        position: "bottom"
+      },
+      {
+        target: "#start-btn",
+        title: "Step 3 — Start Extraction",
+        desc: "Hit Start and the extension will automatically extract company details, emails, and contact info.",
+        position: "top"
+      }
+    ];
+
+    let currentStep = 0;
+
+    // Create overlay
+    const overlay = document.createElement("div");
+    overlay.id = "onboarding-overlay";
+    overlay.className = "onboarding-overlay";
+    document.body.appendChild(overlay);
+
+    // Create tooltip
+    const tooltip = document.createElement("div");
+    tooltip.id = "onboarding-tooltip";
+    tooltip.className = "onboarding-tooltip";
+    document.body.appendChild(tooltip);
+
+    function renderStep(idx) {
+      const step = steps[idx];
+      const targetEl = document.querySelector(step.target);
+      if (!targetEl) { finishOnboarding(); return; }
+
+      // Highlight target
+      document.querySelectorAll(".onboarding-highlight").forEach(el => el.classList.remove("onboarding-highlight"));
+      targetEl.classList.add("onboarding-highlight");
+
+      // Position tooltip
+      const isLast = idx === steps.length - 1;
+      tooltip.innerHTML = `
+        <div class="onboarding-step-indicator">${idx + 1} / ${steps.length}</div>
+        <h3 class="onboarding-title">${step.title}</h3>
+        <p class="onboarding-desc">${step.desc}</p>
+        <div class="onboarding-actions">
+          <button class="onboarding-skip" id="onboarding-skip">Skip</button>
+          <button class="onboarding-next" id="onboarding-next">${isLast ? "Got it!" : "Next →"}</button>
+        </div>
+      `;
+
+      // Position near target — use rAF so tooltip has been laid out
+      targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      requestAnimationFrame(() => {
+        const rect = targetEl.getBoundingClientRect();
+        const tooltipH = tooltip.offsetHeight;
+        const tooltipW = tooltip.offsetWidth;
+        const popupW = document.documentElement.clientWidth;
+        const popupH = document.documentElement.clientHeight;
+
+        let top;
+        if (step.position === "bottom") {
+          top = rect.bottom + 10;
+          // If tooltip would go below viewport, show above instead
+          if (top + tooltipH > popupH - 10) {
+            top = rect.top - tooltipH - 10;
+          }
+        } else {
+          top = rect.top - tooltipH - 10;
+          // If tooltip would go above viewport, show below instead
+          if (top < 10) {
+            top = rect.bottom + 10;
+          }
+        }
+        // Final clamp
+        top = Math.max(10, Math.min(top, popupH - tooltipH - 10));
+
+        const left = Math.max(10, Math.min((popupW - tooltipW) / 2, popupW - tooltipW - 10));
+        tooltip.style.top = top + "px";
+        tooltip.style.left = left + "px";
+        tooltip.style.transform = "none";
+      });
+
+      document.getElementById("onboarding-skip").onclick = finishOnboarding;
+      document.getElementById("onboarding-next").onclick = () => {
+        currentStep++;
+        if (currentStep >= steps.length) {
+          finishOnboarding();
+        } else {
+          renderStep(currentStep);
+        }
+      };
+    }
+
+    function finishOnboarding() {
+      document.querySelectorAll(".onboarding-highlight").forEach(el => el.classList.remove("onboarding-highlight"));
+      overlay.remove();
+      tooltip.remove();
+      chrome.storage.local.set({ onboardingDone: true });
+    }
+
+    // Small delay so popup has rendered
+    setTimeout(() => renderStep(0), 300);
+  }
 });
