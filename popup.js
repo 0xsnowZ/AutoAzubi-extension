@@ -51,7 +51,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const stopBtn = document.getElementById("stop-btn");
   const pauseBtn = document.getElementById("pause-btn");
   const resumeBtn = document.getElementById("resume-btn");
-  const countBtn = document.getElementById("count-btn");
+
   const resetBtn = document.getElementById("reset-btn");
   const arbeitsagenturBtn = document.getElementById("arbeitsagentur-btn");
   const ausbildungBtn = document.getElementById("ausbildung-btn");
@@ -438,8 +438,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   notifyCaptchaCheckbox.addEventListener("change", saveSettings);
   notifyFinishCheckbox.addEventListener("change", saveSettings);
   limitInput.addEventListener("change", () => {
-    chrome.storage.local.set({ targetLimit: parseInt(limitInput.value) || 50 });
+    const newLimit = parseInt(limitInput.value) || 50;
+    chrome.storage.local.set({ targetLimit: newLimit });
     updateProgress();
+
+    // If currently scraping, notify the active script about the new limit
+    if (statusText.innerText === i18n[currentLang]["statusRunning"] ||
+      statusText.innerText === i18n[currentLang]["statusPaused"]) {
+      sendMessageToTab({ action: "updateLimit", limit: newLimit }, () => { });
+    }
   });
 
   function updateUI(status, data) {
@@ -539,15 +546,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Save limit per portal when changed
   limitInput.addEventListener('change', () => {
-    const portalName = detectActivePortalName();
-    if (portalName && portalName !== 'Unknown') {
-      const key = portalName.toLowerCase().replace(/[^a-z]/g, '');
-      chrome.storage.local.get(['portalLimits'], (res) => {
-        const limits = res.portalLimits || {};
-        limits[key] = parseInt(limitInput.value) || 50;
-        chrome.storage.local.set({ portalLimits: limits });
-      });
-    }
+    chrome.storage.local.get(['portalLimits'], (res) => {
+      const limits = res.portalLimits || {};
+      const key = activePortalLabel ? activePortalLabel.toLowerCase().replace(/[^a-z]/g, '') : 'googlemaps';
+      limits[key] = parseInt(limitInput.value) || 50;
+      chrome.storage.local.set({ portalLimits: limits });
+    });
   });
 
   // Auto-navigate removed based on user request
@@ -585,20 +589,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  countBtn.addEventListener("click", async () => {
-    statusText.innerText = i18n[currentLang]["applyingFilters"];
-    countBtn.disabled = true;
 
-    sendMessageToTab({ action: "countResults" }, (response) => {
-      countBtn.disabled = false;
-      updateUI("idle");
-      if (response && response.total !== undefined) {
-        totalDisplay.innerText = response.total;
-        limitInput.value = Math.min(parseInt(limitInput.value), response.total);
-        updateProgress();
-      }
-    });
-  });
 
   startBtn.addEventListener("click", async () => {
     const limit = parseInt(limitInput.value) || 50;
@@ -657,7 +648,13 @@ document.addEventListener("DOMContentLoaded", async () => {
           updateProgress();
           updateUI("idle");
           showToast(toastContainer, i18n[currentLang]["toastReset"], "info");
-          setTimeout(() => countBtn.click(), 100);
+          // Auto-recount after reset
+          sendMessageToTab({ action: "countResults" }, (countResponse) => {
+            if (countResponse && countResponse.total !== undefined) {
+              totalDisplay.innerText = countResponse.total;
+              updateProgress();
+            }
+          });
         } else if (!response) {
           updateUI("error", "Error connecting to content script.");
         }

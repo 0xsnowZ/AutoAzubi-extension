@@ -414,6 +414,11 @@ function createScraperMessageHandler(getState, callbacks) {
         sendResponse({ status: "stopped" });
         return true;
 
+      case "updateLimit":
+        if (callbacks.onUpdateLimit) callbacks.onUpdateLimit(request.limit);
+        sendResponse({ status: "updated" });
+        return true;
+
       case "getInitialInfo":
         chrome.storage.local.get(["scrapedData"], (res) => {
           const state = getState();
@@ -430,6 +435,9 @@ function createScraperMessageHandler(getState, callbacks) {
           sendResponse({ data: res.scrapedData || [] });
         });
         return true;
+
+      default:
+        return false; // Unhandled action — let other listeners handle it
     }
   };
 }

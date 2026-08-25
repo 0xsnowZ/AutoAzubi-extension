@@ -22,8 +22,7 @@ async function applyFilters() {
         if (ausbildungCheckbox && ausbildungLabel) {
             if (!ausbildungCheckbox.checked) {
                 ausbildungLabel.click();
-                // Wait a bit for the page to refresh or apply the filter
-                await new Promise(r => setTimeout(r, 800));
+                await sleep(800);
             }
         }
     }
@@ -38,7 +37,7 @@ async function handleSearchPage(limit = 50) {
     await applyFilters();
 
     // Give it a moment to ensure cards are loaded
-    await new Promise(r => setTimeout(r, 1000));
+    await sleep(1000);
 
     let currentData = await new Promise(r => {
         chrome.storage.local.get(['scrapedData'], res => r(res.scrapedData || []));
@@ -56,7 +55,7 @@ async function handleSearchPage(limit = 50) {
         if (!isScraping) break;
 
         while (isPaused) {
-            await new Promise(r => setTimeout(r, 500));
+            await sleep(500);
             if (!isScraping) break;
         }
         if (!isScraping) break;
@@ -123,7 +122,7 @@ async function handleSearchPage(limit = 50) {
         const BATCH_SIZE = 5;
         for (let i = 0; i < cardUrls.length; i += BATCH_SIZE) {
             while (isPaused) {
-                await new Promise(r => setTimeout(r, 500));
+                await sleep(500);
                 if (!isScraping) break;
             }
             if (!isScraping) break;
@@ -231,6 +230,9 @@ async function handleSearchPage(limit = 50) {
 
             // Save once per batch instead of per-item
             await new Promise(r => chrome.storage.local.set({ scrapedData: currentData }, r));
+
+            // Anti-bot delay between batches
+            await sleep(200);
         }
 
         currentPage++;
@@ -283,6 +285,7 @@ chrome.runtime.onMessage.addListener(
         () => ({ isScraping, isPaused }),
         {
             onSettings: (s) => { settings = s; },
+            onUpdateLimit: (limit) => { targetLimit = limit; },
             onPause: () => { isPaused = true; },
             onResume: () => { isPaused = false; },
             onStop: () => { isScraping = false; isPaused = false; },

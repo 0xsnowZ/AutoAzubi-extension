@@ -320,6 +320,66 @@ body[data-theme="dark"] .status-card {
   display: flex;
   justify-content: center;
   align-items: center;
+  position: relative;
+}
+
+/* Reset icon beside ring */
+.ring-reset-btn {
+  position: absolute;
+  right: -42px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s ease;
+  opacity: 0.6;
+}
+
+.ring-reset-btn:hover {
+  opacity: 1;
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.06);
+  box-shadow: 0 0 8px -2px rgba(239, 68, 68, 0.25);
+}
+
+.ring-reset-btn:hover svg {
+  animation: spin-once 0.5s ease;
+}
+
+.ring-reset-btn:active {
+  transform: translateY(-50%) scale(0.9);
+}
+
+@keyframes spin-once {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+body[data-theme="dark"] .ring-reset-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+body[data-theme="dark"] .ring-reset-btn:hover {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.3);
+  background: rgba(248, 113, 113, 0.08);
+  box-shadow: 0 0 10px -2px rgba(248, 113, 113, 0.2);
 }
 
 .progress-ring-container {
@@ -416,8 +476,15 @@ body[data-theme="dark"] .progress-ring-bg {
 }
 
 @keyframes throttle-pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
+
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
+  }
 }
 
 .status-value {

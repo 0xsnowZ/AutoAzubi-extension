@@ -3,9 +3,13 @@
 // Next.js client-side navigation cannot be reliably triggered from a content script.
 // We save all state to chrome.storage.local, navigate via window.location.href,
 // and auto-resume when this script re-runs on the new page.
+// NOTE (B5): This adds ~3-4s overhead per page (re-injection + hydration wait).
+// fetch()-based pagination was tested but Next.js returns a shell without rendered
+// job cards, so full reload is required for this portal.
 
 let isScraping = false;
 let isPaused = false;
+let targetLimit = 50;
 
 const PORTAL_SOURCE = 'Ausbildung.de';
 
@@ -70,7 +74,8 @@ async function runScraping(session) {
   // BUG FIX: Destructure immutable values and mutable state correctly.
   // `currentData` and `page` need to be `let` for mutation.
   // `processedLinks` is rebuilt from the array each resume to avoid stale Set.
-  const { limit, baseUrl } = session;
+  const { baseUrl } = session;
+  targetLimit = session.limit; // Sync module-level limit from session
   let { currentData, page, processedHits: savedHits, dryPageCount: savedDryPages } = session;
   const processedLinks = new Set(session.processedLinks || []);
   let processedHits = savedHits || 0; // Persist across page reloads
@@ -79,7 +84,7 @@ async function runScraping(session) {
   const MAX_EMPTY_PAGES = 3;
   const MAX_DRY_PAGES = 5;     // Stop if 5 consecutive pages yield no emails
 
-  while (isScraping && currentData.filter(d => d.source === PORTAL_SOURCE).length < limit) {
+  while (isScraping && currentData.filter(d => d.source === PORTAL_SOURCE).length < targetLimit) {
     // ── Pause loop ──────────────────────────────────────────────────────────
     while (isPaused) {
       await sleep(500);
@@ -122,7 +127,7 @@ async function runScraping(session) {
           if (!isScraping) return;
         }
       }
-      if (currentData.filter(d => d.source === PORTAL_SOURCE).length >= limit) break;
+      if (currentData.filter(d => d.source === PORTAL_SOURCE).length >= targetLimit) break;
 
       processedLinks.add(jobUrl);
       processedHits++;
@@ -182,7 +187,7 @@ async function runScraping(session) {
       await sleepWithThrottle(Math.floor(Math.random() * 250) + 200);
     }
 
-    if (currentData.filter(d => d.source === PORTAL_SOURCE).length >= limit) break;
+    if (currentData.filter(d => d.source === PORTAL_SOURCE).length >= targetLimit) break;
 
     // If this page had zero new emails, increment dry page counter
     if (currentData.length === countBefore) {
@@ -202,7 +207,7 @@ async function runScraping(session) {
     }
 
     // ── All links on this page done, move to next page ──────────────────────
-    await navigateToNextPage(page + 1, baseUrl, currentData, limit, processedLinks, processedHits, dryPageCount);
+    await navigateToNextPage(page + 1, baseUrl, currentData, targetLimit, processedLinks, processedHits, dryPageCount);
     return; // Script resumes after page reload
   }
 
@@ -369,6 +374,13 @@ chrome.runtime.onMessage.addListener(
     () => ({ isScraping, isPaused }),
     {
       onSettings: (s) => { settings = s; },
+      onUpdateLimit: (limit) => {
+        targetLimit = limit;
+        // Also persist to session for page-reload resume
+        loadSession().then(session => {
+          if (session) { session.limit = limit; saveSession(session); }
+        });
+      },
       onPause: () => {
         isPaused = true;
         chrome.storage.local.set({ isPaused: true });
@@ -382,6 +394,8 @@ chrome.runtime.onMessage.addListener(
         isPaused = false;
         clearSession();
         chrome.storage.local.set({ isScraping: false, isPaused: false });
+        // Notify popup of state transition so UI doesn't get stuck on "Extracting"
+        chrome.runtime.sendMessage({ action: 'finished', count: 0, portalCount: 0, stopped: true }).catch(() => {});
       },
       start: (request, sendResponse) => {
         const limit = request.limit || 50;

@@ -65,6 +65,7 @@ chrome.runtime.onMessage.addListener(
                 settings = s;
                 chrome.storage.local.set(s);
             },
+            onUpdateLimit: (limit) => { targetLimit = limit; },
             onPause: () => {
                 isPaused = true;
                 updateStorage();
@@ -164,6 +165,8 @@ async function _startScraping() {
         await sleep(800);
     }
 
+    let portalCount = scrapedData.filter(d => d.source === PORTAL_SOURCE).length;
+
     while (isScraping) {
         if (isPaused) {
             console.log("Scraping paused...");
@@ -172,7 +175,7 @@ async function _startScraping() {
 
         let cards = document.querySelectorAll('[id^="ergebnisliste-item-"]');
 
-        let portalCount = scrapedData.filter(d => d.source === PORTAL_SOURCE).length;
+        portalCount = scrapedData.filter(d => d.source === PORTAL_SOURCE).length;
 
         if (portalCount < targetLimit) {
             for (let i = currentCardIndex; i < cards.length; i++) {
@@ -219,7 +222,6 @@ async function _startScraping() {
 
                         scrapedData.push(info);
                         portalCount++;
-                        updateStorage();
                         console.log(`Extracted (${portalCount}/${targetLimit}):`, info);
                         chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, portalCount, currentTitle: info.company });
                     }
@@ -229,7 +231,8 @@ async function _startScraping() {
 
                 await sleepWithThrottle(150);
                 currentCardIndex = i + 1;
-                updateStorage();
+                // Batch storage writes: save every 5 cards instead of every card
+                if (currentCardIndex % 5 === 0) updateStorage();
             }
         }
 
@@ -243,6 +246,7 @@ async function _startScraping() {
         if (loadMoreBtn && isScraping && !isPaused) {
             console.log("Loading more results...");
             loadMoreBtn.click();
+            currentCardIndex = 0; // Reset index for the newly loaded cards
             await sleep(1000);
         } else if (!loadMoreBtn) {
             console.log("No more results available.");
@@ -481,7 +485,7 @@ function extractInfo() {
         email = extractEmailFromHtml(descContainer.innerHTML);
     }
 
-    // Return object if we found email (already enforced above, but returning consistent object)
+    // Return object with email
     if (email) {
         return { company, contact, address, email, phone, source: 'Arbeitsagentur', extractedAt: new Date().toISOString() };
     }

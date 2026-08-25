@@ -11,6 +11,24 @@ let settings = { notifyFinish: true };
 // sleep, extractEmailFromHtml, extractPhoneFromHtml, extractCompanyFromDoc, extractAddressFromDoc
 // are provided by utils.js (loaded first via manifest.json)
 
+// ─── Session Persistence ──────────────────────────────────────────────────────
+
+const AZUBI_SESSION_KEY = 'azubiScrapingSession';
+
+async function saveAzubiSession(session) {
+  return new Promise(r => chrome.storage.local.set({ [AZUBI_SESSION_KEY]: session }, r));
+}
+
+async function loadAzubiSession() {
+  return new Promise(r =>
+    chrome.storage.local.get([AZUBI_SESSION_KEY], res => r(res[AZUBI_SESSION_KEY] || null))
+  );
+}
+
+async function clearAzubiSession() {
+  return new Promise(r => chrome.storage.local.remove(AZUBI_SESSION_KEY, r));
+}
+
 // Extract all unique job detail links from a parsed document
 function extractJobLinksFromDoc(doc) {
   const links = new Set();
@@ -77,7 +95,6 @@ async function handleSearchPage(limit = 50) {
 
   const processedLinks = new Set();
 
-  // Determine base search URL (strip page param)
   const baseUrl = (() => {
     const url = new URL(window.location.href);
     url.searchParams.delete("page");
@@ -87,6 +104,9 @@ async function handleSearchPage(limit = 50) {
   let page = 1;
   let emptyPageCount = 0;
   const MAX_EMPTY_PAGES = 10;
+
+  // Save initial session
+  await saveAzubiSession({ limit, baseUrl, page, processedLinks: [] });
 
   while (isScraping && currentData.filter(d => d.source === PORTAL_SOURCE).length < limit) {
     // Pause check
@@ -209,6 +229,11 @@ async function handleSearchPage(limit = 50) {
       }
 
       await sleepWithThrottle(300);
+
+      // Save session periodically for crash recovery
+      if (processedLinks.size % 5 === 0) {
+        await saveAzubiSession({ limit, baseUrl, page, processedLinks: [...processedLinks] });
+      }
     }
 
     // Move to next page after processing all links on this page
@@ -228,6 +253,7 @@ async function handleSearchPage(limit = 50) {
   }
   isScraping = false;
   isPaused = false;
+  await clearAzubiSession();
   chrome.storage.local.set({ isScraping: false, isPaused: false });
 }
 
@@ -240,6 +266,7 @@ handleSearchPage = async function(limit) {
     console.error('[Azubi] Scraping error:', err);
     isScraping = false;
     isPaused = false;
+    await clearAzubiSession();
     chrome.storage.local.set({ isScraping: false, isPaused: false });
     chrome.runtime.sendMessage({ action: 'error', message: String(err) });
   }
@@ -280,6 +307,7 @@ chrome.runtime.onMessage.addListener(
     () => ({ isScraping, isPaused }),
     {
       onSettings: (s) => { settings = s; },
+      onUpdateLimit: (limit) => { targetLimit = limit; },
       onPause: () => { isPaused = true; },
       onResume: () => { isPaused = false; },
       onStop: () => { isScraping = false; isPaused = false; },
@@ -291,7 +319,13 @@ chrome.runtime.onMessage.addListener(
       reset: (request, sendResponse) => {
         isScraping = false;
         isPaused = false;
+        clearAzubiSession();
         chrome.storage.local.set({ scrapedData: [] }, () => sendResponse({ status: "reset" }));
+      },
+      onStop: () => {
+        isScraping = false;
+        isPaused = false;
+        clearAzubiSession();
       },
       countResults: (request, sendResponse) => {
         countResults().then((total) => sendResponse({ total }));
@@ -299,3 +333,34 @@ chrome.runtime.onMessage.addListener(
     }
   )
 );
+
+// ─── Auto-Resume on Page Load ─────────────────────────────────────────────────
+(async () => {
+  await sleep(1000);
+  const session = await loadAzubiSession();
+  if (!session) return;
+
+  console.log(`[Azubi] Auto-resuming session on page ${session.page}...`);
+  isScraping = true;
+  isPaused = false;
+
+  const currentData = await new Promise(r =>
+    chrome.storage.local.get(['scrapedData'], res => r(res.scrapedData || []))
+  );
+
+  chrome.runtime.sendMessage({
+    action: 'progress',
+    count: currentData.length,
+    portalCount: currentData.filter(d => d.source === PORTAL_SOURCE).length,
+    currentTitle: `[Azubi] Resumed on page ${session.page}`,
+  });
+
+  try {
+    await handleSearchPage(session.limit);
+  } catch (err) {
+    console.error('[Azubi] Resume error:', err);
+    isScraping = false;
+    isPaused = false;
+    await clearAzubiSession();
+  }
+})();

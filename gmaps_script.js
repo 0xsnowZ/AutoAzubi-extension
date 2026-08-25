@@ -11,6 +11,9 @@ let currentPageUrl = null;
 let processedHits = 0;        // tracks total hits checked across all pages
 let currentHitStartIndex = 0; // tracks hit index within the current page for pause/resume
 
+// Domain crawl cache: skip websites we already checked for email
+const crawledDomains = new Map(); // domain -> email or ''
+
 // Helper function to wait
 // sleep, sleepWithThrottle, waitForElement, extractEmailFromHtml, extractPhoneFromHtml
 // are provided by utils.js (loaded first via manifest.json)
@@ -26,8 +29,9 @@ let settings = {
 // ─── Session Persistence ─────────────────────────────────────────────────────────
 
 function saveGmapsSession() {
+    // Save session metadata separately from scrapedData to reduce serialization cost
+    chrome.storage.local.set({ scrapedData });
     chrome.storage.local.set({
-        scrapedData,
         [GMAPS_SESSION_KEY]: {
             currentPageUrl,
             currentHitStartIndex,
@@ -255,10 +259,21 @@ async function crawlWebsiteForEmail(websiteUrl) {
  * Returns '' if the crawl exceeds the time limit.
  */
 async function crawlWebsiteForEmailWithTimeout(websiteUrl, timeoutMs = 6000) {
-    return Promise.race([
-        crawlWebsiteForEmail(websiteUrl),
-        new Promise(resolve => setTimeout(() => resolve(''), timeoutMs))
-    ]);
+    // Check domain cache first — avoid re-crawling the same site
+    try {
+        const domain = new URL(websiteUrl).hostname;
+        if (crawledDomains.has(domain)) {
+            return crawledDomains.get(domain);
+        }
+        const email = await Promise.race([
+            crawlWebsiteForEmail(websiteUrl),
+            new Promise(resolve => setTimeout(() => resolve(''), timeoutMs))
+        ]);
+        crawledDomains.set(domain, email);
+        return email;
+    } catch (e) {
+        return '';
+    }
 }
 
 async function startScraping() {
@@ -342,22 +357,19 @@ async function _startScraping() {
             if (portalCount >= targetLimit) break;
 
             const remaining = targetLimit - portalCount;
-            const chunk = hitsArray.slice(i, i + Math.min(BATCH_SIZE, Math.max(remaining, 1)));
+            // Reduce batch size when near limit to prevent race condition overshoot
+            const effectiveBatch = remaining <= BATCH_SIZE ? 1 : BATCH_SIZE;
+            const chunk = hitsArray.slice(i, i + Math.min(effectiveBatch, Math.max(remaining, 1)));
 
             await Promise.allSettled(chunk.map(hit => {
                 if (!isScraping || isPaused || portalCount >= targetLimit) return Promise.resolve();
                 return processHit(hit);
             }));
 
-            // Recalculate portalCount after parallel batch
+            // Recalculate portalCount after batch
             portalCount = scrapedData.filter(d => d.source === PORTAL_SOURCE).length;
 
-            // Trim any overshoot from parallel race conditions
-            if (portalCount > targetLimit) {
-                scrapedData = scrapedData.filter(d => d.source !== PORTAL_SOURCE)
-                    .concat(scrapedData.filter(d => d.source === PORTAL_SOURCE).slice(0, targetLimit));
-                portalCount = targetLimit;
-            }
+            // Remove overshoot trim — no longer needed with single-item batching near limit
 
             // Save session after each batch for crash recovery
             saveGmapsSession();
@@ -424,7 +436,7 @@ async function processHit(hit) {
             processedHits++;
             const pc = scrapedData.filter(d => d.source === PORTAL_SOURCE).length;
             chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, portalCount: pc, currentTitle: `[DÖ] Checked ${processedHits} hits... Scanning ${company}` });
-            await sleepWithThrottle(Math.random() * 80 + 20);
+            await sleep(Math.random() * 80 + 20); // Short delay, not rate limiting
 
             // Quick check: try to extract email directly from the list-page hit HTML
             let email = extractEmailFromHtml(hit.innerHTML);
@@ -475,6 +487,7 @@ chrome.runtime.onMessage.addListener(
                 settings = s;
                 chrome.storage.local.set(s);
             },
+            onUpdateLimit: (limit) => { targetLimit = limit; },
             onPause: () => { isPaused = true; },
             onResume: () => { isPaused = false; },
             start: (request, sendResponse) => {
