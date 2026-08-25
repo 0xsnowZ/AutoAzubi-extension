@@ -145,10 +145,10 @@
       <!-- Controls -->
       <div class="controls">
 
-        <!-- Target input -->
-        <div class="input-group">
-          <label for="fetch-limit" data-i18n="targetLabel">Extraction Limit</label>
-          <input type="number" id="fetch-limit" value="50" min="1" />
+        <div class="limit-pill">
+          <span class="limit-pill-label" data-i18n="targetLabel">Limit</span>
+          <input type="number" id="fetch-limit" class="limit-pill-value" value="50" min="1" />
+          <button id="limit-max-btn" class="limit-pill-max" title="Set to max available offers">MAX</button>
         </div>
 
         <!-- Initial buttons -->

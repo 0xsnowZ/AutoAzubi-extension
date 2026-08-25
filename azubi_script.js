@@ -186,7 +186,40 @@ async function handleSearchPage(limit = 50) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, "text/html");
 
-        const company = extractCompanyFromDoc(doc);
+        let company = extractCompanyFromDoc(doc);
+
+        // Azubi.de fallback: try additional selectors specific to this portal
+        if (!company) {
+          const azubiSelectors = [
+            'h2.company-header',
+            '.company-header a',
+            '.company-header',
+            '[data-company]',
+            '.listing-company',
+            '.job-company',
+            '.company a',
+            '.company',
+          ];
+          for (const sel of azubiSelectors) {
+            const el = doc.querySelector(sel);
+            if (el) {
+              const text = el.textContent.trim();
+              if (text && text.length < 120) { company = text; break; }
+            }
+          }
+        }
+
+        // Final fallback: use the job/offer title as company name
+        if (!company) {
+          const titleEl = doc.querySelector('h1') || doc.querySelector('title');
+          if (titleEl) {
+            let title = titleEl.textContent.trim();
+            // Clean up common suffixes like " | Azubi.de"
+            title = title.replace(/\s*[|–—-]\s*(azubi\.de|azubi).*$/i, '').trim();
+            if (title && title.length < 120) company = title;
+          }
+        }
+
         const address = extractAddressFromDoc(doc);
 
         // Email dedup: skip if this email was already scraped
@@ -197,11 +230,10 @@ async function handleSearchPage(limit = 50) {
         }
 
         currentData.push({
-          company,
+          company: company || "Unknown",
           email,
           address,
           contact: "",
-          anrede: "",
           link: jobUrl,
           phone,
           source: PORTAL_SOURCE,
@@ -228,7 +260,7 @@ async function handleSearchPage(limit = 50) {
         console.error("[Azubi] Error fetching:", jobUrl, err);
       }
 
-      await sleepWithThrottle(300);
+      await sleep(300); // Anti-bot jitter (not rate limiting)
 
       // Save session periodically for crash recovery
       if (processedLinks.size % 5 === 0) {
@@ -310,7 +342,6 @@ chrome.runtime.onMessage.addListener(
       onUpdateLimit: (limit) => { targetLimit = limit; },
       onPause: () => { isPaused = true; },
       onResume: () => { isPaused = false; },
-      onStop: () => { isScraping = false; isPaused = false; },
       start: (request, sendResponse) => {
         const limit = request.limit || 50;
         if (!isScraping) handleSearchPage(limit);

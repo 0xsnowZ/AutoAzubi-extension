@@ -164,10 +164,22 @@ async function runScraping(session) {
 
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, "text/html");
-        const company = extractCompanyFromDoc(doc);
-        const address = extractAddressFromDoc(doc);
+        let company = extractCompanyFromDoc(doc);
 
-        currentData.push({ company, email, address, contact: "", anrede: "", link: jobUrl, phone: "", source: PORTAL_SOURCE, extractedAt: new Date().toISOString() });
+        // Fallback: use job title as company name when company can't be found
+        if (!company) {
+          const titleEl = doc.querySelector('h1') || doc.querySelector('title');
+          if (titleEl) {
+            let title = titleEl.textContent.trim();
+            title = title.replace(/\s*[|–—-]\s*(ausbildung\.de|ausbildung).*$/i, '').trim();
+            if (title && title.length < 120) company = title;
+          }
+        }
+
+        const address = extractAddressFromDoc(doc);
+        const phone = extractPhoneFromHtml(html);
+
+        currentData.push({ company: company || "Unknown", email, address, contact: "", link: jobUrl, phone, source: PORTAL_SOURCE, extractedAt: new Date().toISOString() });
 
         // Persist to storage immediately so no data is lost on crash/stop
         await new Promise((r) => chrome.storage.local.set({ scrapedData: currentData }, r));
@@ -184,7 +196,7 @@ async function runScraping(session) {
       }
 
       // Anti-bot jitter: 200–450ms randomized delay
-      await sleepWithThrottle(Math.floor(Math.random() * 250) + 200);
+      await sleep(Math.floor(Math.random() * 250) + 200); // Anti-bot jitter
     }
 
     if (currentData.filter(d => d.source === PORTAL_SOURCE).length >= targetLimit) break;

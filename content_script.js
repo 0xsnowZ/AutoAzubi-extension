@@ -23,7 +23,7 @@ let settings = {
 };
 
 // Initialize State from Storage
-chrome.storage.local.get(['scrapedData', 'isScraping', 'isPaused', 'targetLimit', 'filtersApplied', 'currentCardIndex', 'notifyCaptcha', 'notifyFinish'], (result) => {
+chrome.storage.local.get(['scrapedData', 'isScraping', 'isPaused', 'targetLimit', 'filtersApplied', 'currentCardIndex', 'waitingForCaptcha', 'notifyCaptcha', 'notifyFinish'], (result) => {
     if (result.scrapedData) scrapedData = result.scrapedData;
     if (result.isScraping !== undefined) isScraping = result.isScraping;
     if (result.isPaused !== undefined) isPaused = result.isPaused;
@@ -37,7 +37,23 @@ chrome.storage.local.get(['scrapedData', 'isScraping', 'isPaused', 'targetLimit'
     console.log(`State recovered: ${scrapedData.length} records, isScraping: ${isScraping}, isPaused: ${isPaused}`);
 
     if (isScraping && !isPaused) {
-        startScraping();
+        // If page reloaded while waiting for captcha, auto-PAUSE instead of
+        // auto-restarting. This prevents the loop where the script keeps
+        // restarting, hitting captcha, page refreshes, repeat.
+        if (result.waitingForCaptcha) {
+            console.log('[Recovery] Was waiting for captcha — auto-pausing to avoid loop.');
+            isPaused = true;
+            chrome.storage.local.set({ waitingForCaptcha: false, isPaused: true });
+            chrome.runtime.sendMessage({
+                action: 'progress',
+                status: 'paused',
+                count: scrapedData.length,
+                portalCount: scrapedData.filter(d => d.source === PORTAL_SOURCE).length,
+                currentTitle: '⚠ Captcha — tap Resume after solving'
+            });
+        } else {
+            startScraping();
+        }
     }
 });
 
@@ -78,6 +94,7 @@ chrome.runtime.onMessage.addListener(
             onStop: () => {
                 isScraping = false;
                 isPaused = false;
+                chrome.storage.local.set({ waitingForCaptcha: false });
                 updateStorage();
             },
             start: (request, sendResponse) => {
@@ -89,6 +106,7 @@ chrome.runtime.onMessage.addListener(
                     currentCardIndex = 0;
                 }
                 targetLimit = request.limit || 50;
+                chrome.storage.local.set({ waitingForCaptcha: false });
                 updateStorage();
                 startScraping();
                 sendResponse({ status: 'started' });
@@ -99,6 +117,7 @@ chrome.runtime.onMessage.addListener(
                 scrapedData = [];
                 filtersApplied = false;
                 currentCardIndex = 0;
+                chrome.storage.local.set({ waitingForCaptcha: false });
                 updateStorage();
                 sendResponse({ status: 'reset' });
             },
@@ -188,7 +207,7 @@ async function _startScraping() {
                 // Smart wait: return as soon as the detail panel or bewerbung button appears
                 await waitForElement(
                     () => document.getElementById('detailansicht-zur-bewerbung') || document.getElementById('detail-bewerbung-mail'),
-                    2000, 150
+                    2000
                 );
 
                 // Click "Info zur Bewerbung" to request contact details
@@ -217,7 +236,10 @@ async function _startScraping() {
                     if (isDuplicate) {
                         console.log(`Card ${i}: Duplicate email ${info.email}, skipping.`);
                     } else {
-                        const linkElement = document.getElementById(`agdarstellung-websitelink-${i}`);
+                        // Try to find website link in the detail panel
+                        const linkElement = document.querySelector('#agdarstellung-websitelink') ||
+                            document.querySelector('[id*="websitelink"]') ||
+                            document.querySelector('.detail-bewerbung a[href^="http"]');
                         info.link = linkElement ? linkElement.href : '';
 
                         scrapedData.push(info);
@@ -231,8 +253,8 @@ async function _startScraping() {
 
                 await sleepWithThrottle(150);
                 currentCardIndex = i + 1;
-                // Batch storage writes: save every 5 cards instead of every card
-                if (currentCardIndex % 5 === 0) updateStorage();
+                // Save after every card for better captcha recovery
+                updateStorage();
             }
         }
 
@@ -244,10 +266,28 @@ async function _startScraping() {
 
         const loadMoreBtn = document.getElementById('ergebnisliste-ladeweitere-button');
         if (loadMoreBtn && isScraping && !isPaused) {
-            console.log("Loading more results...");
+            const prevCount = cards.length;
+
+            // If currentCardIndex is beyond visible cards (e.g. after page reload),
+            // we already processed these cards in a previous session.
+            // Just click Load More without resetting index.
+            if (currentCardIndex <= prevCount) {
+                currentCardIndex = prevCount; // Continue from where new cards will appear
+            }
+            // Otherwise keep currentCardIndex as-is (it was saved from a previous session
+            // and might point into the next batch)
+
+            console.log(`Loading more results... (currentCardIndex: ${currentCardIndex})`);
             loadMoreBtn.click();
-            currentCardIndex = 0; // Reset index for the newly loaded cards
-            await sleep(1000);
+            // Wait for new cards to actually appear instead of fixed sleep
+            await waitForElement(
+                () => {
+                    const newCards = document.querySelectorAll('[id^="ergebnisliste-item-"]');
+                    return newCards.length > prevCount ? newCards[prevCount] : null;
+                },
+                5000
+            );
+            await sleep(300); // Brief settle time after DOM update
         } else if (!loadMoreBtn) {
             console.log("No more results available.");
             break;
@@ -293,6 +333,15 @@ async function handleCaptcha() {
     let captchaForm = document.getElementById('captchaForm') || document.querySelector('form[id*="captcha"]') || document.getElementById('kontaktdaten-captcha-input') || document.querySelector('[id*="kontaktdaten-captcha"]');
     if (captchaForm) {
         console.log("Captcha detected!");
+
+        // Scroll to captcha so user can solve it immediately
+        captchaForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // Save state immediately so if page refreshes during captcha,
+        // recovery knows to auto-pause instead of restarting the loop
+        updateStorage();
+        chrome.storage.local.set({ waitingForCaptcha: true });
+
         chrome.runtime.sendMessage({ action: 'progress', status: 'waiting_captcha' });
 
         // Setup repeating sound every 4 seconds
@@ -429,6 +478,9 @@ async function handleCaptcha() {
             await sleep(1000);
         }
 
+        // Captcha solved — clear the flag
+        chrome.storage.local.set({ waitingForCaptcha: false });
+
         if (soundInterval) clearInterval(soundInterval);
         if (notice) notice.remove();
         return true;
@@ -442,55 +494,121 @@ function extractInfo() {
     const phoneElement = document.getElementById('detail-bewerbung-telefon-Telefon');
     const descContainer = document.getElementById('detail-beschreibung-text-container');
 
-    // Requirement 2: Skip data without email
-    if (!mailElement) {
-        console.log("No email ID 'detail-bewerbung-mail' found, skipping...");
+    // Skip data without any email source
+    if (!mailElement && !descContainer) {
+        console.log("No email source found, skipping...");
         return null;
     }
 
     let company = '';
     let contact = '';
     let address = '';
-    let email = mailElement.innerText.trim();
     let phone = '';
 
-    // Requirement 1: Extract phone from href
-    if (phoneElement) {
-        // Usually href="tel:+49..."
-        phone = phoneElement.getAttribute('href') ? phoneElement.getAttribute('href').replace('tel:', '').trim() : phoneElement.innerText.trim();
+    // ── Email extraction: mailto href → innerText → description fallback ──
+    let email = '';
+    if (mailElement) {
+        // Priority 1: mailto: href (most reliable)
+        const href = mailElement.getAttribute('href') || '';
+        const mailtoMatch = href.match(/^mailto:([^?\s]+)/i);
+        if (mailtoMatch) {
+            email = mailtoMatch[1].trim();
+        }
+        // Priority 2: innerText
+        if (!email) {
+            email = mailElement.innerText.trim();
+        }
+    }
+    // Priority 3: search in description HTML
+    if (!email && descContainer) {
+        email = extractEmailFromHtml(descContainer.innerHTML);
     }
 
+    // Validate email format
+    if (email && !/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(email)) {
+        email = '';
+    }
+
+    if (!email) return null;
+
+    // ── Phone extraction ──
+    if (phoneElement) {
+        const href = phoneElement.getAttribute('href') || '';
+        phone = href.startsWith('tel:') ? href.replace('tel:', '').trim() : phoneElement.innerText.trim();
+    }
+
+    // ── Company / Contact / Address extraction ──
     if (addressParent) {
         const html = addressParent.innerHTML;
-        const lines = html.split(/<br\s*\/?>/i).map(l => l.trim().replace(/<.*?>/g, ''));
+        const lines = html.split(/<br\s*\/?>/i).map(l => l.trim().replace(/<.*?>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').trim()).filter(Boolean);
+
         company = lines[0] || '';
 
-        // Heuristic: if lines[1] looks like a street address (contains a digit
-        // followed by common German street suffixes), treat it as part of the
-        // address rather than a contact person name.
-        const streetPattern = /\d/.test(lines[1] || '') &&
-            /(?:str|stra|straße|weg|platz|allee|ring|damm|gasse|hof|markt)/i.test(lines[1] || '');
+        // Tighter street heuristic: digit must be part of a number-word pattern
+        // like "Musterstr. 12" or "12 Hauptplatz", not just any line with a digit
+        const isStreetLine = (line) => {
+            if (!line) return false;
+            const hasStreetWord = /(?:str|stra|straße|weg|platz|allee|ring|damm|gasse|hof|markt|chaussee|ufer)/i.test(line);
+            const hasHouseNumber = /(?:^\d|\s\d|\d\s*$)/.test(line);
+            return hasStreetWord && hasHouseNumber;
+        };
 
-        if (streetPattern) {
+        if (lines.length > 1 && isStreetLine(lines[1])) {
             contact = '';
             address = lines.slice(1).join(', ');
-        } else {
+        } else if (lines.length > 1) {
             contact = lines[1] || '';
             address = lines.slice(2).join(', ');
         }
     }
 
-    // If no email found in regular field, search in description using shared utils
-    if (!email && descContainer) {
-        email = extractEmailFromHtml(descContainer.innerHTML);
+    // ── Company fallback: detail panel header or page title ──
+    if (!company) {
+        // Try the detail panel header (Arbeitsagentur shows company name there)
+        const detailHeader = document.querySelector('#detail-kopfbereich-titel') ||
+            document.querySelector('[id*="detail-kopfbereich"] h2') ||
+            document.querySelector('[id*="detail"] [class*="titel"]') ||
+            document.querySelector('[class*="detail"] h2') ||
+            document.querySelector('.ergebnis-details h2');
+        if (detailHeader) {
+            const text = detailHeader.textContent.trim();
+            if (text && text.length < 120) company = text;
+        }
     }
 
-    // Return object with email
-    if (email) {
-        return { company, contact, address, email, phone, source: 'Arbeitsagentur', extractedAt: new Date().toISOString() };
+    if (!company) {
+        // Try the page's active card title
+        const activeCard = document.querySelector('[id^="ergebnisliste-item-"].active, [id^="ergebnisliste-item-"][aria-selected="true"]');
+        if (activeCard) {
+            const titleEl = activeCard.querySelector('h2, h3, [class*="titel"]');
+            if (titleEl) {
+                const text = titleEl.textContent.trim();
+                if (text && text.length < 120) company = text;
+            }
+        }
     }
 
-    return null;
+    // ── Try additional phone sources ──
+    if (!phone) {
+        // Try Fax or Mobil fields if Telefon was not found
+        const altPhoneEl = document.getElementById('detail-bewerbung-telefon-Fax') ||
+            document.getElementById('detail-bewerbung-telefon-Mobil') ||
+            document.querySelector('[id*="detail-bewerbung-telefon"]');
+        if (altPhoneEl) {
+            const href = altPhoneEl.getAttribute('href') || '';
+            phone = href.startsWith('tel:') ? href.replace('tel:', '').trim() : altPhoneEl.innerText.trim();
+        }
+    }
+
+    return {
+        company: company || 'Unknown',
+        contact,
+        address,
+        email,
+        phone,
+        source: 'Arbeitsagentur',
+        extractedAt: new Date().toISOString()
+    };
 }
 
 // sleep() provided by utils.js

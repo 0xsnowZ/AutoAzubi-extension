@@ -589,7 +589,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-
+  // MAX button — set limit to total available offers
+  const maxBtn = document.getElementById("limit-max-btn");
+  if (maxBtn) {
+    maxBtn.addEventListener("click", () => {
+      const totalText = (totalDisplay.innerText || "").replace(/[^0-9]/g, "");
+      const total = parseInt(totalText);
+      if (total && total > 0) {
+        limitInput.value = total;
+        limitInput.dispatchEvent(new Event("change"));
+        // Brief highlight flash
+        maxBtn.style.background = "rgba(99, 102, 241, 0.4)";
+        setTimeout(() => { maxBtn.style.background = ""; }, 300);
+      }
+    });
+  }
 
   startBtn.addEventListener("click", async () => {
     const limit = parseInt(limitInput.value) || 50;

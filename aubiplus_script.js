@@ -218,7 +218,6 @@ async function handleSearchPage(limit = 50) {
                     email: email,
                     address: address,
                     contact: contact || '',
-                    anrede: '',
                     link: href,
                     phone: phone,
                     source: PORTAL_SOURCE,

@@ -601,39 +601,102 @@ body[data-theme="dark"] .active-site-badge {
   gap: 8px;
 }
 
-/* ── Inputs ────────────────────────────────────────── */
-.input-group {
+/* ── Limit Pill ────────────────────────────────────── */
+.limit-pill {
   display: flex;
   align-items: center;
+  align-self: center;
   gap: 0;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 999px;
   overflow: hidden;
-  transition: border-color var(--transition), box-shadow var(--transition);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  width: fit-content;
 }
 
-.input-group:focus-within {
-  border-color: rgba(99, 102, 241, 0.4);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.08);
+.limit-pill:focus-within {
+  border-color: rgba(99, 102, 241, 0.45);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08);
 }
 
-.input-group label {
-  font-size: 12px;
-  font-weight: 600;
+.limit-pill-label {
+  font-size: 11px;
+  font-weight: 700;
   color: var(--text-muted);
-  letter-spacing: 0.3px;
-  padding: 0 12px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 6px 10px 6px 14px;
   white-space: nowrap;
   user-select: none;
-  border-right: 1px solid var(--border);
-  line-height: 38px;
-  background: transparent;
 }
 
-body[data-theme="dark"] .input-group label {
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(255, 255, 255, 0.6);
+.limit-pill-value {
+  width: 48px;
+  padding: 6px 12px 6px 6px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: "Outfit", sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+  appearance: textfield;
+  -moz-appearance: textfield;
+  outline: none;
+}
+
+.limit-pill-value::-webkit-outer-spin-button,
+.limit-pill-value::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+body[data-theme="dark"] .limit-pill {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+body[data-theme="dark"] .limit-pill-label {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+body[data-theme="dark"] .limit-pill-value {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.limit-pill-max {
+  padding: 4px 10px;
+  margin: 3px 3px 3px 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.12);
+  color: rgb(99, 102, 241);
+  font-family: "Outfit", sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.limit-pill-max:hover {
+  background: rgba(99, 102, 241, 0.22);
+  transform: scale(1.05);
+}
+
+.limit-pill-max:active {
+  transform: scale(0.95);
+}
+
+body[data-theme="dark"] .limit-pill-max {
+  background: rgba(99, 102, 241, 0.15);
+  color: rgba(129, 132, 255, 0.9);
+}
+
+body[data-theme="dark"] .limit-pill-max:hover {
+  background: rgba(99, 102, 241, 0.3);
 }
 
 input[type="number"],
