@@ -219,6 +219,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       .getElementById("lang-ar")
       .classList.toggle("active", lang === "ar");
 
+    const settingsLangDropdown = document.getElementById("settings-lang");
+    if (settingsLangDropdown) {
+      settingsLangDropdown.value = lang;
+    }
+
     chrome.storage.local.set({ uiLang: lang });
 
     const statusClass = statusText.className;
@@ -247,15 +252,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     .getElementById("lang-ar")
     .addEventListener("click", () => applyLanguage("ar"));
 
+  const settingsLangDropdown = document.getElementById("settings-lang");
+  if (settingsLangDropdown) {
+    settingsLangDropdown.addEventListener("change", (e) => applyLanguage(e.target.value));
+  }
+
   // Theme logic
-  let currentTheme = "light";
+  let currentTheme = "system";
   const themeToggleBtn = document.getElementById("theme-toggle");
   const iconSun = document.getElementById("theme-icon-sun");
   const iconMoon = document.getElementById("theme-icon-moon");
 
   function applyTheme(theme) {
     currentTheme = theme;
-    if (theme === "dark") {
+    let effectiveTheme = theme;
+    if (theme === "system") {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      effectiveTheme = prefersDark ? "dark" : "light";
+    }
+
+    if (effectiveTheme === "dark") {
       document.body.setAttribute("data-theme", "dark");
       iconMoon.classList.add("hidden");
       iconSun.classList.remove("hidden");
@@ -264,24 +280,31 @@ document.addEventListener("DOMContentLoaded", async () => {
       iconSun.classList.add("hidden");
       iconMoon.classList.remove("hidden");
     }
+
+    const settingsThemeDropdown = document.getElementById("settings-theme");
+    if (settingsThemeDropdown) {
+      settingsThemeDropdown.value = theme;
+    }
     chrome.storage.local.set({ uiTheme: theme });
   }
 
   themeToggleBtn.addEventListener("click", () => {
-    applyTheme(currentTheme === "light" ? "dark" : "light");
+    let effectiveTheme = currentTheme;
+    if (currentTheme === "system") {
+      effectiveTheme = document.body.hasAttribute("data-theme") ? "dark" : "light";
+    }
+    applyTheme(effectiveTheme === "light" ? "dark" : "light");
   });
+
+  const settingsThemeDropdown = document.getElementById("settings-theme");
+  if (settingsThemeDropdown) {
+    settingsThemeDropdown.addEventListener("change", (e) => applyTheme(e.target.value));
+  }
 
   // 1. Load language preference and show scraper directly
   chrome.storage.local.get(["uiLang", "uiTheme"], (res) => {
     applyLanguage(res.uiLang || "en");
-    // Auto-detect dark mode from OS if no saved preference
-    const savedTheme = res.uiTheme;
-    if (savedTheme) {
-      applyTheme(savedTheme);
-    } else {
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      applyTheme(prefersDark ? "dark" : "light");
-    }
+    applyTheme(res.uiTheme || "system");
     loadState();
   });
 

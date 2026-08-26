@@ -23,7 +23,7 @@
         </div>
         <div class="brand-text">
           <h1 data-i18n="titleText">AutoAzubi Extractor</h1>
-          <p class="subtitle" data-i18n="subtitleText">Automated Data Extractor</p>
+          <p class="subtitle" data-i18n="subtitleText">Smart Lead Extractor</p>
         </div>
       </div>
       <div class="header-controls">
@@ -315,16 +315,34 @@
               </div>
               <input type="checkbox" id="notify-finish" checked />
             </div>
-            <div class="settings-note">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="8" x2="12" y2="12"></line>
-                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-              </svg>
-              <span><strong data-i18n="noteTitle">Note:</strong> <span data-i18n="noteDesc">Please resolve any Captcha
-                  challenges manually to resume data extraction.</span></span>
+            <div class="setting-row">
+              <div class="setting-info">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="2" y1="12" x2="22" y2="12"></line>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                </svg>
+                <span data-i18n="langLabel">Language</span>
+              </div>
+              <select id="settings-lang" class="settings-dropdown">
+                <option value="en">EN - English</option>
+                <option value="ar">AR - العربية</option>
+              </select>
             </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+                <span data-i18n="themeLabel">Theme</span>
+              </div>
+              <select id="settings-theme" class="settings-dropdown">
+                <option value="system" data-i18n="themeSystem">System Auto</option>
+                <option value="light" data-i18n="themeLight">Light Mode</option>
+                <option value="dark" data-i18n="themeDark">Dark Mode</option>
+              </select>
+            </div>
+
           </div>
         </details>
       </div>
