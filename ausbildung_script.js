@@ -136,7 +136,7 @@ async function runScraping(session) {
         action: "progress",
         count: currentData.length,
         portalCount: currentData.filter(d => d.source === PORTAL_SOURCE).length,
-        currentTitle: `[Ausbildung] Job ${processedHits} · Page ${page}`,
+        currentTitle: `Job ${processedHits} · Page ${page}`,
       });
 
       try {
@@ -187,7 +187,7 @@ async function runScraping(session) {
           action: "progress",
           count: currentData.length,
           portalCount: currentData.filter(d => d.source === PORTAL_SOURCE).length,
-          currentTitle: `[Ausbildung] ✓ ${company}`,
+          currentTitle: `✓ ${company}`,
         });
         console.log(`[Ausbildung] ✓ (${currentData.length}/${targetLimit}): ${company} <${email}>`);
 
@@ -210,7 +210,7 @@ async function runScraping(session) {
         chrome.runtime.sendMessage({
           action: "progress",
           count: currentData.length,
-          currentTitle: `[Ausbildung] Done — no more emails found`,
+          currentTitle: `Done — no more emails found`,
         });
         break;
       }
@@ -265,7 +265,7 @@ async function navigateToNextPage(nextPage, baseUrl, currentData, limit, process
   chrome.runtime.sendMessage({
     action: "progress",
     count: currentData.length,
-    currentTitle: `[Ausbildung] Loading page ${nextPage}...`,
+    currentTitle: `Loading page ${nextPage}...`,
   });
 
   await sleep(600); // Brief pause to let storage flush before navigation
@@ -332,7 +332,7 @@ async function handleSearchPage(limit = 50) {
   chrome.runtime.sendMessage({
     action: "progress",
     count: session.currentData.length,
-    currentTitle: `[Ausbildung] Resumed on page ${session.page}`,
+    currentTitle: `Resumed on page ${session.page}`,
   });
 
   try {

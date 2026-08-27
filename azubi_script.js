@@ -384,7 +384,7 @@ chrome.runtime.onMessage.addListener(
     action: 'progress',
     count: currentData.length,
     portalCount: currentData.filter(d => d.source === PORTAL_SOURCE).length,
-    currentTitle: `[Azubi] Resumed on page ${session.page}`,
+    currentTitle: `Resumed on page ${session.page}`,
   });
 
   try {

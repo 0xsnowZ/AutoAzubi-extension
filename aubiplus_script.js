@@ -201,7 +201,7 @@ async function handleSearchPage(limit = 50) {
                 const { href, companyName, address, email, phone, contact } = result.value;
 
                 if (!email) {
-                    chrome.runtime.sendMessage({ action: 'progress', count: currentData.length, portalCount: currentData.filter(d => d.source === PORTAL_SOURCE).length, currentTitle: `[Aubi-Plus] Checking: ${companyName || 'Unknown'} (no email)` });
+                    chrome.runtime.sendMessage({ action: 'progress', count: currentData.length, portalCount: currentData.filter(d => d.source === PORTAL_SOURCE).length, currentTitle: `Checking: ${companyName || 'Unknown'} (no email)` });
                     continue;
                 }
 

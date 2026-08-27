@@ -435,7 +435,7 @@ async function processHit(hit) {
 
             processedHits++;
             const pc = scrapedData.filter(d => d.source === PORTAL_SOURCE).length;
-            chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, portalCount: pc, currentTitle: `[DÖ] Checked ${processedHits} hits... Scanning ${company}` });
+            chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, portalCount: pc, currentTitle: `Checked ${processedHits} hits... Scanning ${company}` });
             await sleep(Math.random() * 80 + 20); // Short delay, not rate limiting
 
             // Quick check: try to extract email directly from the list-page hit HTML
@@ -466,7 +466,7 @@ async function processHit(hit) {
                 if (!isDuplicate && currentPortalCount < targetLimit) {
                     scrapedData.push({ company, address, phone, email, source: PORTAL_SOURCE, extractedAt: new Date().toISOString() });
                     const newPc = currentPortalCount + 1;
-                    chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, portalCount: newPc, currentTitle: `[DÖ] Found email for: ${company}` });
+                    chrome.runtime.sendMessage({ action: 'progress', count: scrapedData.length, portalCount: newPc, currentTitle: `Found email for: ${company}` });
                 }
             }
         }
