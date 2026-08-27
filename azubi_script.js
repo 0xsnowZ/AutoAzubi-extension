@@ -108,7 +108,7 @@ async function handleSearchPage(limit = 50) {
   // Save initial session
   await saveAzubiSession({ limit, baseUrl, page, processedLinks: [] });
 
-  while (isScraping && currentData.filter(d => d.source === PORTAL_SOURCE).length < limit) {
+  while (isScraping && currentData.filter(d => d.source === PORTAL_SOURCE).length < targetLimit) {
     // Pause check
     while (isPaused) {
       await sleep(500);
@@ -162,7 +162,7 @@ async function handleSearchPage(limit = 50) {
 
     for (const jobUrl of jobLinks) {
       if (!isScraping || isPaused) break;
-      if (currentData.filter(d => d.source === PORTAL_SOURCE).length >= limit) break;
+      if (currentData.filter(d => d.source === PORTAL_SOURCE).length >= targetLimit) break;
 
       processedLinks.add(jobUrl);
 
@@ -269,7 +269,7 @@ async function handleSearchPage(limit = 50) {
     }
 
     // Move to next page after processing all links on this page
-    if (currentData.filter(d => d.source === PORTAL_SOURCE).length < limit) {
+    if (currentData.filter(d => d.source === PORTAL_SOURCE).length < targetLimit) {
       page++;
     }
   }
@@ -281,6 +281,7 @@ async function handleSearchPage(limit = 50) {
       action: "finished",
       count: currentData.length,
       portalCount,
+      totalChecked: processedLinks.size || portalCount,
     });
   }
   isScraping = false;

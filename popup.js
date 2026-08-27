@@ -15,8 +15,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   const historyEmpty = document.getElementById("history-empty");
   const clearHistoryBtn = document.getElementById("clear-history-btn");
 
+  function closeAllAutocomplete() {
+    const kwDropdown = document.getElementById("gmaps-keyword-dropdown");
+    const cityDropdown = document.getElementById("gmaps-city-dropdown");
+    if (kwDropdown) kwDropdown.classList.add("hidden");
+    if (cityDropdown) cityDropdown.classList.add("hidden");
+  }
+
   // Setup tabs logic
   tabJobs.addEventListener("click", () => {
+    closeAllAutocomplete();
     tabJobs.classList.add("active");
     tabGmaps.classList.remove("active");
     if (tabHistory) tabHistory.classList.remove("active");
@@ -26,6 +34,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   tabGmaps.addEventListener("click", () => {
+    closeAllAutocomplete();
     tabGmaps.classList.add("active");
     tabJobs.classList.remove("active");
     if (tabHistory) tabHistory.classList.remove("active");
@@ -36,13 +45,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (tabHistory) {
     tabHistory.addEventListener("click", () => {
+      closeAllAutocomplete();
       tabHistory.classList.add("active");
       tabJobs.classList.remove("active");
       tabGmaps.classList.remove("active");
       historyView.classList.add("active-view");
       mainView.classList.remove("active-view");
       gmapsView.classList.remove("active-view");
-      PopupHistory.render(historyList, historyEmpty);
+      PopupHistory.render(historyList, historyEmpty, currentLang);
     });
   }
 
@@ -58,6 +68,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const aubiplusBtn = document.getElementById("aubiplus-btn");
   const azubiBtn = document.getElementById("azubi-btn");
   const downloadExcelBtn = document.getElementById("download-excel-btn");
+  const copyEmailsBtn = document.getElementById("copy-emails-btn");
   const statusText = document.getElementById("status-text");
   const countDisplay = document.getElementById("scraped-count");
   const totalDisplay = document.getElementById("total-found");
@@ -68,6 +79,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const statusCard = document.getElementById("status-card");
   const pulseDot = document.getElementById("pulse-dot");
   const activeSiteBadge = document.getElementById("active-site-badge");
+  let activePortalLabel = "";
 
   // Metrics elements (Group 6)
   const metricsRow = document.getElementById("metrics-row");
@@ -180,11 +192,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // GMaps UI Elements
-  const gmapsBtn = document.getElementById("gmaps-btn");
   const gmapsKeyword = document.getElementById("gmaps-keyword");
   const gmapsCity = document.getElementById("gmaps-city");
   const gmapsSearchBtn = document.getElementById("gmaps-search-btn");
-  const gmapsBackBtn = document.getElementById("gmaps-back-btn");
 
   // Settings
   const notifyCaptchaCheckbox = document.getElementById("notify-captcha");
@@ -192,9 +202,31 @@ document.addEventListener("DOMContentLoaded", async () => {
   const initialBtns = document.getElementById("initial-btns");
   const ongoingBtns = document.getElementById("ongoing-btns");
 
+  function getDefaultBrowserLanguage() {
+    try {
+      const browserLang = (
+        (typeof chrome !== "undefined" && chrome.i18n && typeof chrome.i18n.getUILanguage === "function" && chrome.i18n.getUILanguage()) ||
+        navigator.language ||
+        navigator.userLanguage ||
+        "en"
+      ).toLowerCase();
+
+      if (browserLang.startsWith("de")) return "de";
+      if (browserLang.startsWith("fr")) return "fr";
+      if (browserLang.startsWith("ar")) return "ar";
+      if (browserLang.startsWith("en")) return "en";
+    } catch (e) {
+      console.warn("Failed to detect browser language", e);
+    }
+    return "en";
+  }
+
   let currentLang = "en";
 
   function applyLanguage(lang) {
+    if (!lang || !i18n[lang]) {
+      lang = getDefaultBrowserLanguage();
+    }
     currentLang = lang;
     document.body.dir = lang === "ar" ? "rtl" : "ltr";
     document.querySelectorAll("[data-i18n]").forEach((el) => {
@@ -212,16 +244,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     });
 
-    document
-      .getElementById("lang-en")
-      .classList.toggle("active", lang === "en");
-    document
-      .getElementById("lang-ar")
-      .classList.toggle("active", lang === "ar");
-
     const settingsLangDropdown = document.getElementById("settings-lang");
     if (settingsLangDropdown) {
       settingsLangDropdown.value = lang;
+    }
+
+    const headerLangSelect = document.getElementById("header-lang-select");
+    if (headerLangSelect) {
+      headerLangSelect.value = lang;
     }
 
     chrome.storage.local.set({ uiLang: lang });
@@ -234,23 +264,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     else if (statusClass.includes("status-finished"))
       statusText.innerText = i18n[lang]["statusFinished"];
     else if (statusClass.includes("status-paused")) {
-      if (
-        statusText.innerText === i18n["en"]["waitingCaptcha"] ||
-        statusText.innerText === i18n["ar"]["waitingCaptcha"]
-      ) {
+      const isWaitingCaptcha = Object.values(i18n).some(dict => statusText.innerText === dict.waitingCaptcha);
+      if (isWaitingCaptcha) {
         statusText.innerText = i18n[lang]["waitingCaptcha"];
       } else {
         statusText.innerText = i18n[lang]["statusPaused"];
       }
     }
+
+    if (historyView && historyView.classList.contains("active-view")) {
+      PopupHistory.render(historyList, historyEmpty, lang);
+    }
   }
 
-  document
-    .getElementById("lang-en")
-    .addEventListener("click", () => applyLanguage("en"));
-  document
-    .getElementById("lang-ar")
-    .addEventListener("click", () => applyLanguage("ar"));
+  const headerLangSelect = document.getElementById("header-lang-select");
+  if (headerLangSelect) {
+    headerLangSelect.addEventListener("change", (e) => applyLanguage(e.target.value));
+  }
 
   const settingsLangDropdown = document.getElementById("settings-lang");
   if (settingsLangDropdown) {
@@ -301,9 +331,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     settingsThemeDropdown.addEventListener("change", (e) => applyTheme(e.target.value));
   }
 
-  // 1. Load language preference and show scraper directly
+  // 1. Load language preference (defaults to browser language) and show scraper directly
   chrome.storage.local.get(["uiLang", "uiTheme"], (res) => {
-    applyLanguage(res.uiLang || "en");
+    const initialLang = res.uiLang || getDefaultBrowserLanguage();
+    applyLanguage(initialLang);
     applyTheme(res.uiTheme || "system");
     loadState();
   });
@@ -329,6 +360,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (result.scrapedData) {
           countDisplay.innerText = result.scrapedData.length;
           downloadExcelBtn.disabled = result.scrapedData.length === 0;
+          if (copyEmailsBtn) copyEmailsBtn.disabled = result.scrapedData.length === 0;
           updateProgress();
         }
 
@@ -517,17 +549,28 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   notifyCaptchaCheckbox.addEventListener("change", saveSettings);
   notifyFinishCheckbox.addEventListener("change", saveSettings);
-  limitInput.addEventListener("change", () => {
-    const newLimit = parseInt(limitInput.value) || 50;
+
+  function handleLimitUpdate() {
+    const rawVal = parseInt(limitInput.value);
+    const newLimit = (isNaN(rawVal) || rawVal < 1) ? 50 : rawVal;
+
     chrome.storage.local.set({ targetLimit: newLimit });
     updateProgress();
 
-    // If currently scraping, notify the active script about the new limit
-    if (statusText.innerText === i18n[currentLang]["statusRunning"] ||
-      statusText.innerText === i18n[currentLang]["statusPaused"]) {
-      sendMessageToTab({ action: "updateLimit", limit: newLimit }, () => { });
-    }
-  });
+    // Persist per-portal limit
+    chrome.storage.local.get(['portalLimits'], (res) => {
+      const limits = res.portalLimits || {};
+      const key = activePortalLabel ? activePortalLabel.toLowerCase().replace(/[^a-z]/g, '') : 'googlemaps';
+      limits[key] = newLimit;
+      chrome.storage.local.set({ portalLimits: limits });
+    });
+
+    // Instantly notify the active content script about the new limit in real-time
+    sendMessageToTab({ action: "updateLimit", limit: newLimit }, () => {});
+  }
+
+  limitInput.addEventListener("input", handleLimitUpdate);
+  limitInput.addEventListener("change", handleLimitUpdate);
 
   function updateUI(status, data) {
     if (status === "running")
@@ -604,13 +647,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Export button label
     const count = parseInt(countDisplay.innerText) || 0;
     if (downloadExcelBtn) downloadExcelBtn.disabled = count === 0;
+    if (copyEmailsBtn) copyEmailsBtn.disabled = count === 0;
   }
 
   // Get initial info about total offers
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
   // Highlight the portal matching the current tab
-  const activePortalLabel = detectActivePortal(tab ? tab.url : "");
+  activePortalLabel = detectActivePortal(tab ? tab.url : "");
 
   // Per-portal limit: restore saved limit for the active portal
   if (activePortalLabel) {
@@ -623,16 +667,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     });
   }
-
-  // Save limit per portal when changed
-  limitInput.addEventListener('change', () => {
-    chrome.storage.local.get(['portalLimits'], (res) => {
-      const limits = res.portalLimits || {};
-      const key = activePortalLabel ? activePortalLabel.toLowerCase().replace(/[^a-z]/g, '') : 'googlemaps';
-      limits[key] = parseInt(limitInput.value) || 50;
-      chrome.storage.local.set({ portalLimits: limits });
-    });
-  });
 
   // Auto-navigate removed based on user request
 
@@ -729,6 +763,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const modal = document.getElementById("confirmModal");
     const confirmBtn = document.getElementById("modalConfirm");
     const cancelBtn = document.getElementById("modalCancel");
+    const modalTitle = modal.querySelector("h3");
+    const modalDesc = modal.querySelector("p");
+
+    if (modalTitle) modalTitle.innerText = i18n[currentLang]["modalTitle"];
+    if (modalDesc) modalDesc.innerText = i18n[currentLang]["modalDesc"];
 
     modal.classList.add("show");
 
@@ -739,6 +778,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           countDisplay.innerText = "0";
           totalDisplay.innerText = "\u2014";
           downloadExcelBtn.disabled = true;
+          if (copyEmailsBtn) copyEmailsBtn.disabled = true;
           updateProgress();
           updateUI("idle");
           chrome.runtime.sendMessage({ action: "badgeClear" });
@@ -781,48 +821,285 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  if (gmapsBtn) {
-    gmapsBtn.addEventListener("click", () => {
-      mainView.classList.add("hidden");
-      gmapsView.classList.remove("hidden");
+  // ── Google Maps Autocomplete ────────────────────────────────────────────
+  const GMAPS_INDUSTRIES = [
+    "Systemintegration",
+    "Softwareentwicklung",
+    "Netzwerktechnik",
+    "IT",
+    "Pflege",
+    "Klinik",
+    "Krankenhaus",
+    "Pflegedienst",
+    "Altenpflege",
+    "Sanitär",
+    "Heizung",
+    "Elektriker",
+    "Einzelhandel",
+    "Restaurant",
+    "Gastro",
+    "Hotel",
+    "Spedition",
+    "KFZ",
+    "Automobil",
+    "Marketing",
+    "Handwerk"
+  ];
+
+  const GMAPS_CITIES = [
+    "Berlin",
+    "München",
+    "Hamburg",
+    "Köln",
+    "Frankfurt",
+    "Stuttgart",
+    "Düsseldorf",
+    "Leipzig",
+    "Dortmund",
+    "Essen",
+    "Bremen",
+    "Dresden",
+    "Hannover",
+    "Nürnberg",
+    "Duisburg",
+    "Bochum",
+    "Wuppertal",
+    "Bielefeld",
+    "Bonn",
+    "Münster",
+    "Karlsruhe",
+    "Mannheim",
+    "Augsburg",
+    "Wiesbaden"
+  ];
+
+  const gmapsKeywordDropdown = document.getElementById("gmaps-keyword-dropdown");
+  const gmapsCityDropdown = document.getElementById("gmaps-city-dropdown");
+
+  function setupCustomAutocomplete(inputEl, dropdownEl, list, onSelect) {
+    if (!inputEl || !dropdownEl) return;
+    let selectedIndex = -1;
+
+    function renderOptions(filterText = "") {
+      const query = filterText.toLowerCase().trim();
+      const matches = list.filter((item) => item.toLowerCase().includes(query));
+
+      dropdownEl.innerHTML = "";
+      selectedIndex = -1;
+
+      if (matches.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "gmaps-autocomplete-item--empty";
+        empty.textContent = "No matching suggestions";
+        dropdownEl.appendChild(empty);
+      } else {
+        matches.forEach((item) => {
+          const div = document.createElement("div");
+          div.className = "gmaps-autocomplete-item";
+          div.textContent = item;
+          div.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            inputEl.value = item;
+            dropdownEl.classList.add("hidden");
+            if (onSelect) onSelect(item);
+          });
+          dropdownEl.appendChild(div);
+        });
+      }
+      dropdownEl.classList.remove("hidden");
+    }
+
+    inputEl.addEventListener("focus", () => {
+      renderOptions(inputEl.value);
+    });
+
+    inputEl.addEventListener("input", () => {
+      renderOptions(inputEl.value);
+    });
+
+    inputEl.addEventListener("keydown", (e) => {
+      const items = dropdownEl.querySelectorAll(".gmaps-autocomplete-item");
+      if (dropdownEl.classList.contains("hidden") || items.length === 0) return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        selectedIndex = (selectedIndex + 1) % items.length;
+        updateSelection(items);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+        updateSelection(items);
+      } else if (e.key === "Enter") {
+        if (selectedIndex >= 0 && selectedIndex < items.length) {
+          e.preventDefault();
+          inputEl.value = items[selectedIndex].textContent;
+          dropdownEl.classList.add("hidden");
+          if (onSelect) onSelect(inputEl.value);
+        }
+      } else if (e.key === "Escape") {
+        dropdownEl.classList.add("hidden");
+      }
+    });
+
+    function updateSelection(items) {
+      items.forEach((it, idx) => {
+        it.classList.toggle("active", idx === selectedIndex);
+        if (idx === selectedIndex) {
+          it.scrollIntoView({ block: "nearest" });
+        }
+      });
+    }
+
+    document.addEventListener("click", (e) => {
+      if (!inputEl.contains(e.target) && !dropdownEl.contains(e.target)) {
+        dropdownEl.classList.add("hidden");
+      }
     });
   }
 
-  if (gmapsBackBtn) {
-    gmapsBackBtn.addEventListener("click", () => {
-      gmapsView.classList.add("hidden");
-      mainView.classList.remove("hidden");
+  // Initialize Autocomplete for Industry and City
+  setupCustomAutocomplete(gmapsKeyword, gmapsKeywordDropdown, GMAPS_INDUSTRIES, () => {
+    if (gmapsCity && !gmapsCity.value.trim()) {
+      gmapsCity.focus();
+    }
+  });
+
+  setupCustomAutocomplete(gmapsCity, gmapsCityDropdown, GMAPS_CITIES);
+
+  // Restore last searched values on startup
+  chrome.storage.local.get(["lastGmapsKw", "lastGmapsCity"], (res) => {
+    if (res.lastGmapsKw && gmapsKeyword && !gmapsKeyword.value) {
+      gmapsKeyword.value = res.lastGmapsKw;
+    }
+    if (res.lastGmapsCity && gmapsCity && !gmapsCity.value) {
+      gmapsCity.value = res.lastGmapsCity;
+    }
+  });
+
+  if (gmapsKeyword) {
+    gmapsKeyword.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (!gmapsKeywordDropdown || gmapsKeywordDropdown.classList.contains("hidden"))) {
+        e.preventDefault();
+        if (gmapsCity && !gmapsCity.value.trim()) {
+          gmapsCity.focus();
+        } else if (gmapsSearchBtn) {
+          gmapsSearchBtn.click();
+        }
+      }
+    });
+  }
+
+  if (gmapsCity) {
+    gmapsCity.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (!gmapsCityDropdown || gmapsCityDropdown.classList.contains("hidden"))) {
+        e.preventDefault();
+        if (gmapsSearchBtn) {
+          gmapsSearchBtn.click();
+        }
+      }
     });
   }
 
   if (gmapsSearchBtn) {
     gmapsSearchBtn.addEventListener("click", () => {
-      const kw = gmapsKeyword.value.trim();
-      const city = gmapsCity.value.trim();
-      if (kw && city) {
-        // Save exact query to storage so the scraper doesn't rely on Google Maps URL parsing
-        chrome.storage.local.set(
-          { lastGmapsKw: kw, lastGmapsCity: city },
-          () => {
-            const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(kw)}+in+${encodeURIComponent(city)}`;
-            chrome.tabs.create({ url: searchUrl });
-            // Auto-switch to Job Portals tab so user is ready to scrape
-            tabJobs.click();
-          },
-        );
+      const kw = (gmapsKeyword ? gmapsKeyword.value : "").trim();
+      const city = (gmapsCity ? gmapsCity.value : "").trim();
+
+      if (!kw && !city) {
+        showToast(toastContainer, i18n[currentLang]["gmapsFillBoth"], "warning");
+        if (gmapsKeyword) gmapsKeyword.focus();
+        return;
       }
+      if (!kw) {
+        showToast(toastContainer, i18n[currentLang]["gmapsFillIndustry"], "warning");
+        if (gmapsKeyword) gmapsKeyword.focus();
+        return;
+      }
+      if (!city) {
+        showToast(toastContainer, i18n[currentLang]["gmapsFillCity"], "warning");
+        if (gmapsCity) gmapsCity.focus();
+        return;
+      }
+
+      // Save exact query to storage so the scraper doesn't rely on Google Maps URL parsing
+      chrome.storage.local.set(
+        { lastGmapsKw: kw, lastGmapsCity: city },
+        () => {
+          const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(kw)}+in+${encodeURIComponent(city)}`;
+          chrome.tabs.create({ url: searchUrl });
+          // Auto-switch to Job Portals tab so user is ready to scrape
+          tabJobs.click();
+        },
+      );
     });
   }
 
 
   downloadExcelBtn.addEventListener("click", () => {
-    sendMessageToTab({ action: "getData" }, (response) => {
-      if (response && response.data) {
-        downloadExcel(response.data);
+    const doExport = (data) => {
+      if (data && data.length > 0) {
+        downloadExcel(data);
         showToast(toastContainer, i18n[currentLang]["toastExported"], "success");
+      }
+    };
+    sendMessageToTab({ action: "getData" }, (response) => {
+      if (response && response.data && response.data.length > 0) {
+        doExport(response.data);
+      } else {
+        chrome.storage.local.get(["scrapedData"], (res) => {
+          if (res.scrapedData && res.scrapedData.length > 0) {
+            doExport(res.scrapedData);
+          }
+        });
       }
     });
   });
+
+  if (copyEmailsBtn) {
+    copyEmailsBtn.addEventListener("click", () => {
+      const doCopy = async (data) => {
+        if (!data || data.length === 0) {
+          showToast(toastContainer, i18n[currentLang]["toastNoEmails"], "warning");
+          return;
+        }
+        const result = await copyEmailsToClipboard(data);
+        if (result.success && result.count > 0) {
+          const msg = (i18n[currentLang]["toastEmailsCopied"] || "Copied {count} emails to clipboard")
+            .replace("{count}", result.count);
+          showToast(toastContainer, msg, "success");
+
+          // Button visual feedback
+          const copyIcon = copyEmailsBtn.querySelector(".copy-icon");
+          const checkIcon = copyEmailsBtn.querySelector(".check-icon");
+          copyEmailsBtn.classList.add("copied");
+          if (copyIcon) copyIcon.classList.add("hidden");
+          if (checkIcon) checkIcon.classList.remove("hidden");
+
+          setTimeout(() => {
+            copyEmailsBtn.classList.remove("copied");
+            if (copyIcon) copyIcon.classList.remove("hidden");
+            if (checkIcon) checkIcon.classList.add("hidden");
+          }, 2000);
+        } else {
+          showToast(toastContainer, i18n[currentLang]["toastNoEmails"], "warning");
+        }
+      };
+
+      sendMessageToTab({ action: "getData" }, (response) => {
+        if (response && response.data && response.data.length > 0) {
+          doCopy(response.data);
+        } else {
+          chrome.storage.local.get(["scrapedData"], (res) => {
+            if (res.scrapedData && res.scrapedData.length > 0) {
+              doCopy(res.scrapedData);
+            } else {
+              showToast(toastContainer, i18n[currentLang]["toastNoEmails"], "warning");
+            }
+          });
+        }
+      });
+    });
+  }
 
   // History clear button — uses modal instead of confirm() (blocked in MV3 popups)
   if (clearHistoryBtn) {
@@ -830,13 +1107,21 @@ document.addEventListener("DOMContentLoaded", async () => {
       const modal = document.getElementById("confirmModal");
       const confirmBtn = document.getElementById("modalConfirm");
       const cancelBtn = document.getElementById("modalCancel");
+      const modalTitle = modal.querySelector("h3");
+      const modalDesc = modal.querySelector("p");
+
+      if (modalTitle) modalTitle.innerText = i18n[currentLang]["clearHistoryTitle"];
+      if (modalDesc) modalDesc.innerText = i18n[currentLang]["clearHistoryDesc"];
 
       modal.classList.add("show");
 
       confirmBtn.onclick = () => {
         modal.classList.remove("show");
-        chrome.storage.local.set({ scrapingHistory: [] }, () => {
-          PopupHistory.render(historyList, historyEmpty);
+        chrome.storage.local.set({
+          scrapingHistory: [],
+          lifetimeStats: { totalLeads: 0, totalChecked: 0, sessionsCount: 0, portalStats: {} },
+        }, () => {
+          PopupHistory.render(historyList, historyEmpty, currentLang);
           showToast(toastContainer, i18n[currentLang]["toastReset"], "info");
         });
       };
@@ -872,6 +1157,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         // Update progress after animation settles
         setTimeout(updateProgress, 420);
         downloadExcelBtn.disabled = false;
+        if (copyEmailsBtn) copyEmailsBtn.disabled = false;
         // Update preview table
         updatePreviewFromStorage();
       }
@@ -883,6 +1169,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         updateUI("finished", request);
       }, 420);
       downloadExcelBtn.disabled = false;
+      if (copyEmailsBtn) copyEmailsBtn.disabled = false;
       const count = displayCount || 0;
       PopupMetrics.saveFinalMetrics(count);
       showToast(
@@ -890,7 +1177,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         `${i18n[currentLang]["toastFinished"]} — ${count} leads`,
         "success",
       );
-      PopupHistory.save(count, detectActivePortalName());
+      PopupHistory.save(count, detectActivePortalName(), request.totalChecked);
+      if (historyView && historyView.classList.contains("active-view")) {
+        PopupHistory.render(historyList, historyEmpty);
+      }
       updatePreviewFromStorage();
     } else if (request.action === "error") {
       updateUI("idle");
@@ -906,6 +1196,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     sendMessageToTab({ action: "getData" }, (response) => {
       if (response && response.data) {
         renderPreviewTable(response.data);
+      } else {
+        chrome.storage.local.get(["scrapedData"], (res) => {
+          if (res.scrapedData) renderPreviewTable(res.scrapedData);
+        });
       }
     });
   }

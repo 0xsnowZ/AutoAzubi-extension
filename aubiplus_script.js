@@ -51,7 +51,7 @@ async function handleSearchPage(limit = 50) {
 
     let docToSearch = document;
 
-    while (keepGoing && currentData.filter(d => d.source === PORTAL_SOURCE).length < limit) {
+    while (keepGoing && currentData.filter(d => d.source === PORTAL_SOURCE).length < targetLimit) {
         if (!isScraping) break;
 
         while (isPaused) {
@@ -126,7 +126,7 @@ async function handleSearchPage(limit = 50) {
                 if (!isScraping) break;
             }
             if (!isScraping) break;
-            if (currentData.filter(d => d.source === PORTAL_SOURCE).length >= limit) break;
+            if (currentData.filter(d => d.source === PORTAL_SOURCE).length >= targetLimit) break;
 
             const batch = cardUrls.slice(i, i + BATCH_SIZE);
             const results = await Promise.allSettled(batch.map(async (href) => {
@@ -196,7 +196,7 @@ async function handleSearchPage(limit = 50) {
             // Process batch results
             for (const result of results) {
                 if (result.status !== 'fulfilled' || !result.value) continue;
-                if (currentData.filter(d => d.source === PORTAL_SOURCE).length >= limit) break;
+                if (currentData.filter(d => d.source === PORTAL_SOURCE).length >= targetLimit) break;
 
                 const { href, companyName, address, email, phone, contact } = result.value;
 
@@ -240,7 +240,7 @@ async function handleSearchPage(limit = 50) {
     if (isScraping) {
         if (settings.notifyFinish) finishedSound.play();
         const portalCount = currentData.filter(d => d.source === PORTAL_SOURCE).length;
-        chrome.runtime.sendMessage({ action: 'finished', count: currentData.length, portalCount });
+        chrome.runtime.sendMessage({ action: 'finished', count: currentData.length, portalCount, totalChecked: seenUrls.size || portalCount });
     }
     isScraping = false;
     isPaused = false;

@@ -240,6 +240,7 @@ async function runScraping(session) {
       action: "finished", 
       count: currentData.length,
       portalCount,
+      totalChecked: processedHits || portalCount,
       early: dryPageCount >= MAX_DRY_PAGES,
       empty: emptyPageCount >= MAX_EMPTY_PAGES 
     });

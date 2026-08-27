@@ -402,7 +402,7 @@ async function _startScraping() {
         isPaused = false;
         clearGmapsSession();
         chrome.storage.local.set({ scrapedData });
-        chrome.runtime.sendMessage({ action: 'finished', count: scrapedData.length, portalCount });
+        chrome.runtime.sendMessage({ action: 'finished', count: scrapedData.length, portalCount, totalChecked: processedHits || portalCount });
     }
 }
 

@@ -309,7 +309,7 @@ async function _startScraping() {
         isScraping = false;
         isPaused = false;
         updateStorage();
-        chrome.runtime.sendMessage({ action: 'finished', count: scrapedData.length, portalCount });
+        chrome.runtime.sendMessage({ action: 'finished', count: scrapedData.length, portalCount, totalChecked: currentCardIndex });
     }
 }
 

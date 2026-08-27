@@ -156,7 +156,8 @@
 | **Resume** | Continue scraping from where it was paused |
 | **Stop** | Stop scraping and keep all collected data |
 | **Reset** | Clear all collected data (with confirmation dialog) |
-| **Export Data** | Download all scraped data as a deduplicated `.csv` file |
+| **Excel Export** | Download all scraped data as a clean, deduplicated `.xlsx` file |
+| **Copy Emails** | One-click copy of all extracted, unique email addresses formatted as `email1@corp.de, email2@corp.de` |
 
 ---
 
