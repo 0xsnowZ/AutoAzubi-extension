@@ -6,7 +6,6 @@
 // Allowed domains for fetch proxy — prevents misuse as an open proxy
 const ALLOWED_DOMAINS = [
   "dasoertliche.de",
-  "gelbeseiten.de",
   "arbeitsagentur.de",
   "ausbildung.de",
   "aubi-plus.de",
