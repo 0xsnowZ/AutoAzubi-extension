@@ -816,13 +816,6 @@ input::placeholder {
   border: 1px solid rgba(92, 120, 56, 0.2);
 }
 
-.btn-success:hover:not(:disabled) {
-  background: var(--success);
-  color: #fff;
-  border-color: var(--success);
-  transform: translateY(-1px);
-}
-
 .btn-success:disabled {
   background: transparent;
   color: var(--text-muted);
@@ -1026,6 +1019,18 @@ input::placeholder {
   border: 1px solid rgba(92, 120, 56, 0.18);
 }
 
+.btn-download:not(:disabled):hover {
+  background: var(--success);
+  color: #ffffff;
+  border-color: var(--success);
+  box-shadow: none;
+  transform: translateY(-1px);
+}
+
+.btn-download:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+}
+
 .btn-copy {
   background: rgba(99, 102, 241, 0.08);
   color: var(--accent);
@@ -1187,7 +1192,7 @@ details.settings-section summary::-webkit-details-marker {
 }
 
 details.settings-section summary .chevron {
-  margin-left: auto;
+  margin-inline-start: auto;
   transition: transform 0.25s ease;
   opacity: 0.5;
 }
@@ -1246,7 +1251,7 @@ details.settings-section[open] summary .chevron {
   content: "";
   position: absolute;
   top: 2px;
-  left: 2px;
+  inset-inline-start: 2px;
   width: 12px;
   height: 12px;
   background: var(--text-muted);
@@ -1291,7 +1296,11 @@ details.settings-section[open] summary .chevron {
 }
 
 [dir="rtl"] .setting-row {
-  flex-direction: row-reverse;
+  /* Flexbox with space-between already works correctly in RTL — no row-reverse needed */
+}
+
+[dir="rtl"] .setting-row input[type="checkbox"]:checked::after {
+  transform: translateX(-14px);
 }
 
 /* ── Google Maps View ──────────────────────────────── */
@@ -1935,6 +1944,13 @@ body[data-theme="dark"] .section-label::after {
 body[data-theme="dark"] .btn-download:not(:disabled) {
   background: rgba(130, 180, 80, 0.08);
   border-color: rgba(130, 180, 80, 0.15);
+}
+
+body[data-theme="dark"] .btn-download:not(:disabled):hover {
+  background: #5c7838;
+  color: #ffffff;
+  border-color: #5c7838;
+  box-shadow: none;
 }
 
 body[data-theme="dark"] .btn-copy {

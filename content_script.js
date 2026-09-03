@@ -194,8 +194,6 @@ async function _startScraping() {
 
         let cards = document.querySelectorAll('[id^="ergebnisliste-item-"]');
 
-        portalCount = scrapedData.filter(d => d.source === PORTAL_SOURCE).length;
-
         if (portalCount < targetLimit) {
             for (let i = currentCardIndex; i < cards.length; i++) {
                 if (!isScraping || isPaused) break;
@@ -305,7 +303,7 @@ async function _startScraping() {
 
     // Only set finished if we actually hit the limit or ran out of results
     if (isScraping && !isPaused && (portalCount >= targetLimit || !document.getElementById('ergebnisliste-ladeweitere-button'))) {
-        if (settings.notifyFinish) finishedSound.play();
+        if (settings.notifyFinish) finishedSound.play().catch(() => {});
         isScraping = false;
         isPaused = false;
         updateStorage();
@@ -356,11 +354,11 @@ async function handleCaptcha() {
         // Setup repeating sound every 4 seconds
         let soundInterval = null;
         if (settings.notifyCaptcha) {
-            captchaSound.play();
+            captchaSound.play().catch(() => {});
             soundInterval = setInterval(() => {
                 const stillExists = document.getElementById('captchaForm') || document.querySelector('form[id*="captcha"]') || document.getElementById('kontaktdaten-captcha-input') || document.querySelector('[id*="kontaktdaten-captcha"]');
                 if (stillExists && isScraping) {
-                    captchaSound.play();
+                    captchaSound.play().catch(() => {});
                 } else {
                     clearInterval(soundInterval);
                 }

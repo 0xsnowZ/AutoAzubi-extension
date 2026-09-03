@@ -344,6 +344,16 @@ async function fetchWithRetry(url, options = {}, retries = 2, baseDelayMs = 1000
     try {
       const response = await fetch(url, options);
       if (response.ok || attempt >= retries) return response;
+      // Respect rate limiting — back off significantly on 429
+      if (response.status === 429) {
+        const retryAfter = parseInt(response.headers.get('Retry-After')) || 0;
+        const wait = Math.max(retryAfter * 1000, baseDelayMs * Math.pow(2, attempt + 2));
+        console.warn(
+          `[fetchWithRetry] 429 rate limited, waiting ${wait}ms before retry`,
+        );
+        await sleep(wait);
+        continue;
+      }
       console.warn(
         `[fetchWithRetry] Attempt ${attempt + 1}/${retries + 1} failed (HTTP ${response.status}): ${url}`,
       );
@@ -355,6 +365,30 @@ async function fetchWithRetry(url, options = {}, retries = 2, baseDelayMs = 1000
     }
     await sleep(baseDelayMs * (attempt + 1));
   }
+}
+
+// ─── URL Resolution Helper ──────────────────────────────────────────────────────
+
+/**
+ * Resolve a possibly-relative href from DOMParser output.
+ * DOMParser resolves relative URLs against the chrome-extension:// origin,
+ * which is incorrect. This helper normalizes them to the correct base.
+ *
+ * @param {string} rawHref - The raw href value (may be relative, absolute, or chrome-extension://)
+ * @param {string} baseOrigin - The correct base origin (e.g. 'https://www.aubi-plus.de')
+ * @returns {string} Fully resolved URL
+ */
+function resolveHref(rawHref, baseOrigin) {
+  if (!rawHref) return '';
+  if (rawHref.startsWith('chrome-extension://')) {
+    // DOMParser resolved a relative path against the extension origin — fix it
+    const path = rawHref.replace(/^chrome-extension:\/\/[^/]+/, '');
+    return baseOrigin.replace(/\/+$/, '') + path;
+  }
+  if (rawHref.startsWith('/')) {
+    return baseOrigin.replace(/\/+$/, '') + rawHref;
+  }
+  return rawHref;
 }
 
 // ─── Shared Message Handler Factory ──────────────────────────────────────────────

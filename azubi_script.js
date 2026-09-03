@@ -37,15 +37,9 @@ function extractJobLinksFromDoc(doc) {
     const href = a.getAttribute("href");
     if (!href) return;
 
-    // Build absolute URL
-    let url;
-    if (href.startsWith("http")) {
-      url = href;
-    } else if (href.startsWith("/")) {
-      url = "https://www.azubi.de" + href;
-    } else {
-      return;
-    }
+    // Build absolute URL using shared resolver
+    let url = resolveHref(href, "https://www.azubi.de");
+    if (!url || !url.startsWith("http")) return;
 
     url = url.split("?")[0]; // strip query params
 

@@ -60,7 +60,7 @@ function _deduplicateData(data) {
       seenEmails.add(email);
       return true;
     }
-    const key = `${company.toLowerCase()}|${(row.address || "").trim().toLowerCase()}`;
+    const key = `${company.toLowerCase().replace(/\s+/g, ' ')}|${(row.address || "").trim().toLowerCase().replace(/\s+/g, ' ')}`;
     if (seenCompanyAddr.has(key)) return false;
     seenCompanyAddr.add(key);
     return true;

@@ -29,9 +29,9 @@ let settings = {
 // ─── Session Persistence ─────────────────────────────────────────────────────────
 
 function saveGmapsSession() {
-    // Save session metadata separately from scrapedData to reduce serialization cost
-    chrome.storage.local.set({ scrapedData });
+    // Save session metadata and data atomically to prevent partial-write race conditions
     chrome.storage.local.set({
+        scrapedData,
         [GMAPS_SESSION_KEY]: {
             currentPageUrl,
             currentHitStartIndex,

@@ -106,12 +106,8 @@ async function handleSearchPage(limit = 50) {
             let href = linkElement.href || linkElement.getAttribute('href');
             if (!href) continue;
 
-            // Resolving URLs parsed by DOMParser from text
-            if (href.startsWith('chrome-extension://')) {
-                href = new URL(linkElement.getAttribute('href'), 'https://www.aubi-plus.de').href;
-            } else if (href.startsWith('/')) {
-                href = 'https://www.aubi-plus.de' + href;
-            }
+            // Resolve URLs from DOMParser (may have chrome-extension:// prefix)
+            href = resolveHref(linkElement.getAttribute('href') || href, 'https://www.aubi-plus.de');
 
             if (!seenUrls.has(href)) {
                 cardUrls.push(href);
@@ -238,7 +234,7 @@ async function handleSearchPage(limit = 50) {
     }
 
     if (isScraping) {
-        if (settings.notifyFinish) finishedSound.play();
+        if (settings.notifyFinish) finishedSound.play().catch(() => {});
         const portalCount = currentData.filter(d => d.source === PORTAL_SOURCE).length;
         chrome.runtime.sendMessage({ action: 'finished', count: currentData.length, portalCount, totalChecked: seenUrls.size || portalCount });
     }

@@ -2,6 +2,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ── Aliases for extracted modules ──────────────────────────────────────────
   const i18n = window.AutoAzubiI18n;
 
+  // Reusable element for decoding HTML entities (avoids creating per-tick)
+  const _decodeEl = document.createElement("textarea");
+
   // View Elements
   const mainView = document.getElementById("main-view");
   const gmapsView = document.getElementById("gmaps-view");
@@ -602,11 +605,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (metricsRow) metricsRow.classList.remove("hidden");
       PopupMetrics.startEtaTimer();
       if (
-        activityLog.innerText === "Ready to start..." ||
-        activityLog.innerText === "Ready to download." ||
-        activityLog.innerText.includes("Stopped early")
+        Object.values(i18n).some(dict =>
+          activityLog.innerText === dict.activityReady ||
+          activityLog.innerText === dict.activityDownload ||
+          activityLog.innerText.includes(dict.activityStopped?.split(":")[0] || "Stopped early")
+        )
       ) {
-        activityLog.innerText = "Extracting data...";
+        activityLog.innerText = i18n[currentLang]["activityExtracting"];
       }
     } else if (status === "paused") {
       initialBtns.classList.add("hidden");
@@ -629,9 +634,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (metricsRow) metricsRow.classList.remove("hidden");
 
         if (data && (data.early || data.empty)) {
-          activityLog.innerText = "Stopped early: no more emails found.";
+          activityLog.innerText = i18n[currentLang]["activityStopped"];
         } else {
-          activityLog.innerText = "Ready to download.";
+          activityLog.innerText = i18n[currentLang]["activityDownload"];
         }
         updateProgress(); // Sets real % instead of forcing 100%
       } else {
@@ -639,7 +644,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         activityLog.classList.remove("active");
         if (metricsRow) metricsRow.classList.add("hidden");
         if (progressRing) progressRing.style.strokeDashoffset = 364.42;
-        activityLog.innerText = "Ready to start...";
+        activityLog.innerText = i18n[currentLang]["activityReady"];
         PopupMetrics.resetDisplay();
       }
     }
@@ -936,7 +941,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (request.status === "waiting_captcha") {
         updateUI("paused");
         statusText.innerText = i18n[currentLang]["waitingCaptcha"];
-        activityLog.innerText = "Captcha detected... Please solve.";
+        activityLog.innerText = i18n[currentLang]["activityCaptcha"];
         showToast(toastContainer, i18n[currentLang]["toastCaptcha"], "warning");
       } else if (request.status === "throttling") {
         // Rate limiting visualization
@@ -949,9 +954,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         PopupMetrics.updateMetrics(displayCount || 0);
         activityLog.classList.remove("throttling");
         if (request.currentTitle) {
-          const tempEl = document.createElement("textarea");
-          tempEl.innerHTML = request.currentTitle;
-          activityLog.innerText = tempEl.value;
+          _decodeEl.innerHTML = request.currentTitle;
+          activityLog.innerText = _decodeEl.value;
         }
         // Update progress after animation settles
         setTimeout(updateProgress, 420);
@@ -1032,6 +1036,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // Load preview on popup open
+  updatePreviewFromStorage();
+
   function truncate(str, max) {
     return str.length > max ? str.slice(0, max - 1) + "\u2026" : str;
   }
@@ -1041,9 +1048,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (badge && badge.textContent) return badge.textContent.trim();
     return "Unknown";
   }
-
-  // Load preview on popup open
-  updatePreviewFromStorage();
 
   // ── Onboarding Tutorial (delegated to popup_onboarding.js) ─────────────
   PopupOnboarding.checkAndShow();
