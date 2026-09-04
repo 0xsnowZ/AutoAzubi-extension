@@ -19,11 +19,12 @@ const finishedSound = new Audio(chrome.runtime.getURL('finished.mp3'));
 // Settings Cache
 let settings = {
     notifyCaptcha: false,
-    notifyFinish: true
+    notifyFinish: true,
+    autoExport: false
 };
 
 // Initialize State from Storage
-chrome.storage.local.get(['scrapedData', 'isScraping', 'isPaused', 'targetLimit', 'filtersApplied', 'currentCardIndex', 'waitingForCaptcha', 'notifyCaptcha', 'notifyFinish'], (result) => {
+chrome.storage.local.get(['scrapedData', 'isScraping', 'isPaused', 'targetLimit', 'filtersApplied', 'currentCardIndex', 'waitingForCaptcha', 'notifyCaptcha', 'notifyFinish', 'autoExport'], (result) => {
     if (result.scrapedData) scrapedData = result.scrapedData;
     if (result.isScraping !== undefined) isScraping = result.isScraping;
     if (result.isPaused !== undefined) isPaused = result.isPaused;
@@ -33,6 +34,7 @@ chrome.storage.local.get(['scrapedData', 'isScraping', 'isPaused', 'targetLimit'
 
     settings.notifyCaptcha = result.notifyCaptcha === true;
     settings.notifyFinish = result.notifyFinish !== false;
+    settings.autoExport = result.autoExport === true;
 
     console.log(`State recovered: ${scrapedData.length} records, isScraping: ${isScraping}, isPaused: ${isPaused}`);
 
@@ -307,7 +309,8 @@ async function _startScraping() {
         isScraping = false;
         isPaused = false;
         updateStorage();
-        chrome.runtime.sendMessage({ action: 'finished', count: scrapedData.length, portalCount, totalChecked: currentCardIndex });
+        const autoExported = triggerAutoExport(scrapedData, settings);
+        chrome.runtime.sendMessage({ action: 'finished', count: scrapedData.length, portalCount, totalChecked: currentCardIndex, autoExported });
     }
 }
 

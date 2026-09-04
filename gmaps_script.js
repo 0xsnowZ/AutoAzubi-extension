@@ -23,7 +23,8 @@ const finishedSound = new Audio(chrome.runtime.getURL('finished.mp3'));
 // Settings Cache
 let settings = {
     notifyCaptcha: false,
-    notifyFinish: true
+    notifyFinish: true,
+    autoExport: false
 };
 
 // ─── Session Persistence ─────────────────────────────────────────────────────────
@@ -48,10 +49,11 @@ function clearGmapsSession() {
 }
 
 // Initialize State from Storage — auto-resume if a session was active
-chrome.storage.local.get(['scrapedData', GMAPS_SESSION_KEY, 'notifyCaptcha', 'notifyFinish'], (result) => {
+chrome.storage.local.get(['scrapedData', GMAPS_SESSION_KEY, 'notifyCaptcha', 'notifyFinish', 'autoExport'], (result) => {
     if (result.scrapedData) scrapedData = result.scrapedData;
     settings.notifyCaptcha = result.notifyCaptcha === true;
     settings.notifyFinish = result.notifyFinish !== false;
+    settings.autoExport = result.autoExport === true;
 
     const session = result[GMAPS_SESSION_KEY];
     if (session) {
@@ -402,7 +404,8 @@ async function _startScraping() {
         isPaused = false;
         clearGmapsSession();
         chrome.storage.local.set({ scrapedData });
-        chrome.runtime.sendMessage({ action: 'finished', count: scrapedData.length, portalCount, totalChecked: processedHits || portalCount });
+        const autoExported = triggerAutoExport(scrapedData, settings);
+        chrome.runtime.sendMessage({ action: 'finished', count: scrapedData.length, portalCount, totalChecked: processedHits || portalCount, autoExported });
     }
 }
 

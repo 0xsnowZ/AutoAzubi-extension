@@ -6,7 +6,11 @@ let targetLimit = 50;
 const PORTAL_SOURCE = 'Aubi-Plus.de';
 
 const finishedSound = new Audio(chrome.runtime.getURL('finished.mp3'));
-let settings = { notifyFinish: true };
+let settings = { notifyFinish: true, autoExport: false };
+chrome.storage.local.get(["notifyFinish", "autoExport"], (res) => {
+    if (res.notifyFinish !== undefined) settings.notifyFinish = res.notifyFinish !== false;
+    if (res.autoExport !== undefined) settings.autoExport = res.autoExport === true;
+});
 
 // waitForElement() provided by utils.js (MutationObserver-based, loaded first via manifest.json)
 
@@ -236,7 +240,8 @@ async function handleSearchPage(limit = 50) {
     if (isScraping) {
         if (settings.notifyFinish) finishedSound.play().catch(() => {});
         const portalCount = currentData.filter(d => d.source === PORTAL_SOURCE).length;
-        chrome.runtime.sendMessage({ action: 'finished', count: currentData.length, portalCount, totalChecked: seenUrls.size || portalCount });
+        const autoExported = triggerAutoExport(currentData, settings);
+        chrome.runtime.sendMessage({ action: 'finished', count: currentData.length, portalCount, totalChecked: seenUrls.size || portalCount, autoExported });
     }
     isScraping = false;
     isPaused = false;

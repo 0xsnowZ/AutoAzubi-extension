@@ -14,7 +14,11 @@ let targetLimit = 50;
 const PORTAL_SOURCE = 'Ausbildung.de';
 
 const finishedSound = new Audio(chrome.runtime.getURL("finished.mp3"));
-let settings = { notifyFinish: true };
+let settings = { notifyFinish: true, autoExport: false };
+chrome.storage.local.get(["notifyFinish", "autoExport"], (res) => {
+  if (res.notifyFinish !== undefined) settings.notifyFinish = res.notifyFinish !== false;
+  if (res.autoExport !== undefined) settings.autoExport = res.autoExport === true;
+});
 
 // sleep, extractEmailFromHtml, extractCompanyFromDoc, extractAddressFromDoc
 // are provided by utils.js (loaded first via manifest.json)
@@ -236,13 +240,15 @@ async function runScraping(session) {
   if (wasRunning) {
     if (settings.notifyFinish) finishedSound.play().catch(() => {});
     const portalCount = currentData.filter(d => d.source === PORTAL_SOURCE).length;
+    const autoExported = triggerAutoExport(currentData, settings);
     chrome.runtime.sendMessage({ 
       action: "finished", 
       count: currentData.length,
       portalCount,
       totalChecked: processedHits || portalCount,
       early: dryPageCount >= MAX_DRY_PAGES,
-      empty: emptyPageCount >= MAX_EMPTY_PAGES 
+      empty: emptyPageCount >= MAX_EMPTY_PAGES,
+      autoExported,
     });
   }
 }

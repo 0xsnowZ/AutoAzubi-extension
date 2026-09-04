@@ -202,6 +202,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Settings
   const notifyCaptchaCheckbox = document.getElementById("notify-captcha");
   const notifyFinishCheckbox = document.getElementById("notify-finish");
+  const autoExportCheckbox = document.getElementById("auto-export");
   const initialBtns = document.getElementById("initial-btns");
   const ongoingBtns = document.getElementById("ongoing-btns");
 
@@ -348,6 +349,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       [
         "notifyCaptcha",
         "notifyFinish",
+        "autoExport",
         "scrapedData",
         "isScraping",
         "isPaused",
@@ -359,6 +361,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       (result) => {
         notifyCaptchaCheckbox.checked = result.notifyCaptcha === true;
         notifyFinishCheckbox.checked = result.notifyFinish !== false;
+        if (autoExportCheckbox) {
+          autoExportCheckbox.checked = result.autoExport === true;
+        }
 
         if (result.scrapedData) {
           countDisplay.innerText = result.scrapedData.length;
@@ -440,6 +445,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     return {
       notifyCaptcha: notifyCaptchaCheckbox.checked,
       notifyFinish: notifyFinishCheckbox.checked,
+      autoExport: autoExportCheckbox ? autoExportCheckbox.checked : false,
     };
   }
 
@@ -552,6 +558,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   notifyCaptchaCheckbox.addEventListener("change", saveSettings);
   notifyFinishCheckbox.addEventListener("change", saveSettings);
+  if (autoExportCheckbox) {
+    autoExportCheckbox.addEventListener("change", saveSettings);
+  }
 
   function handleLimitUpdate() {
     const rawVal = parseInt(limitInput.value);
@@ -839,11 +848,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
 
-  downloadExcelBtn.addEventListener("click", () => {
+  function triggerExport(isAuto = false) {
     const doExport = (data) => {
       if (data && data.length > 0) {
         downloadExcel(data);
-        showToast(toastContainer, i18n[currentLang]["toastExported"], "success");
+        const toastKey = isAuto ? "toastAutoExported" : "toastExported";
+        showToast(toastContainer, i18n[currentLang][toastKey], "success");
       }
     };
     sendMessageToTab({ action: "getData" }, (response) => {
@@ -857,7 +867,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
       }
     });
-  });
+  }
+
+  downloadExcelBtn.addEventListener("click", () => triggerExport(false));
 
   if (copyEmailsBtn) {
     copyEmailsBtn.addEventListener("click", () => {
@@ -985,6 +997,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         PopupHistory.render(historyList, historyEmpty);
       }
       updatePreviewFromStorage();
+
+      // Auto-export on finish if enabled
+      if (autoExportCheckbox && autoExportCheckbox.checked && count > 0) {
+        if (request.autoExported) {
+          showToast(toastContainer, i18n[currentLang]["toastAutoExported"], "success");
+        } else {
+          triggerExport(true);
+        }
+      }
     } else if (request.action === "error") {
       updateUI("idle");
       activityLog.classList.add("active");

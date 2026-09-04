@@ -475,3 +475,25 @@ function createScraperMessageHandler(getState, callbacks) {
     }
   };
 }
+
+/**
+ * Automatically export scraped leads to Excel if autoExport setting is enabled.
+ * @param {Array<Object>} data - Array of scraped lead objects
+ * @param {Object} settings - Settings object containing autoExport boolean
+ * @returns {boolean} True if export was triggered successfully
+ */
+function triggerAutoExport(data, settings) {
+  if (!settings || !settings.autoExport || !data || data.length === 0) {
+    return false;
+  }
+  try {
+    if (typeof window.downloadExcel === "function") {
+      window.downloadExcel(data);
+      return true;
+    }
+  } catch (err) {
+    console.error("[AutoAzubi] Auto-export error:", err);
+  }
+  return false;
+}
+

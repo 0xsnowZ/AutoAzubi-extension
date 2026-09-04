@@ -46,19 +46,19 @@
   "content_scripts": [
     {
       "matches": ["*://*.arbeitsagentur.de/*"],
-      "js": ["utils.js", "content_script.js"]
+      "js": ["xlsx.mini.min.js", "popup_csv.js", "utils.js", "content_script.js"]
     },
     {
       "matches": ["*://*.ausbildung.de/*"],
-      "js": ["utils.js", "ausbildung_script.js"]
+      "js": ["xlsx.mini.min.js", "popup_csv.js", "utils.js", "ausbildung_script.js"]
     },
     {
       "matches": ["*://*.aubi-plus.de/*"],
-      "js": ["utils.js", "aubiplus_script.js"]
+      "js": ["xlsx.mini.min.js", "popup_csv.js", "utils.js", "aubiplus_script.js"]
     },
     {
       "matches": ["*://*.azubi.de/*"],
-      "js": ["utils.js", "azubi_script.js"]
+      "js": ["xlsx.mini.min.js", "popup_csv.js", "utils.js", "azubi_script.js"]
     },
     {
       "matches": [
@@ -67,7 +67,7 @@
         "*://maps.google.com/*",
         "*://maps.google.de/*"
       ],
-      "js": ["utils.js", "gmaps_script.js"]
+      "js": ["xlsx.mini.min.js", "popup_csv.js", "utils.js", "gmaps_script.js"]
     }
   ],
   "background": {
